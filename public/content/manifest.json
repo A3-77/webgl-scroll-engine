@@ -1,0 +1,215 @@
+{
+  "version": 1,
+  "generator": "scripts/build-assets",
+  "generatedAt": "2026-09-20T16:19:26+08:00",
+  "scenes": [
+    {
+      "id": "scene01",
+      "source": {
+        "width": 1536,
+        "height": 1024,
+        "aspect": 1.5
+      },
+      "background": "content/scene01/background.webp",
+      "subjects": [
+        {
+          "id": "subject-01",
+          "path": "content/scene01/subject-01.png",
+          "box": {
+            "x": 0.21354166666666666,
+            "y": 0.2353515625,
+            "w": 0.19270833333333334,
+            "h": 0.5263671875
+          },
+          "center": {
+            "x": 0.3098958333333333,
+            "y": 0.49853515625
+          },
+          "aspect": 0.5492,
+          "areaRatio": 0.0605,
+          "pixelCount": 95209,
+          "size": [
+            296,
+            539
+          ]
+        },
+        {
+          "id": "subject-02",
+          "path": "content/scene01/subject-02.png",
+          "box": {
+            "x": 0.7747395833333334,
+            "y": 0.2802734375,
+            "w": 0.17903645833333334,
+            "h": 0.48046875
+          },
+          "center": {
+            "x": 0.8642578125,
+            "y": 0.5205078125
+          },
+          "aspect": 0.5589,
+          "areaRatio": 0.0572,
+          "pixelCount": 89962,
+          "size": [
+            275,
+            492
+          ]
+        },
+        {
+          "id": "subject-03",
+          "path": "content/scene01/subject-03.png",
+          "box": {
+            "x": 0.3997395833333333,
+            "y": 0.2939453125,
+            "w": 0.19596354166666666,
+            "h": 0.4677734375
+          },
+          "center": {
+            "x": 0.4977213541666667,
+            "y": 0.52783203125
+          },
+          "aspect": 0.6284,
+          "areaRatio": 0.0571,
+          "pixelCount": 89848,
+          "size": [
+            301,
+            479
+          ]
+        },
+        {
+          "id": "subject-04",
+          "path": "content/scene01/subject-04.png",
+          "box": {
+            "x": 0.0390625,
+            "y": 0.2978515625,
+            "w": 0.18098958333333334,
+            "h": 0.4658203125
+          },
+          "center": {
+            "x": 0.12955729166666666,
+            "y": 0.53076171875
+          },
+          "aspect": 0.5828,
+          "areaRatio": 0.0561,
+          "pixelCount": 88163,
+          "size": [
+            278,
+            477
+          ]
+        },
+        {
+          "id": "subject-05",
+          "path": "content/scene01/subject-05.png",
+          "box": {
+            "x": 0.5891927083333334,
+            "y": 0.2958984375,
+            "w": 0.19205729166666666,
+            "h": 0.46484375
+          },
+          "center": {
+            "x": 0.6852213541666666,
+            "y": 0.5283203125
+          },
+          "aspect": 0.6197,
+          "areaRatio": 0.0551,
+          "pixelCount": 86687,
+          "size": [
+            295,
+            476
+          ]
+        }
+      ],
+      "provider": "colorkey",
+      "generatedAt": "2026-09-20T16:19:29+08:00",
+      "backgroundColor": [
+        243,
+        243,
+        245
+      ],
+      "confidence": "high",
+      "metrics": {
+        "thresholdUsed": 14.0,
+        "thresholdFloor": 14.0,
+        "adaptiveTriggered": false,
+        "borderBandP": 4.0,
+        "chromaGateUsed": false,
+        "contrastMargin": 3.786,
+        "rawForegroundRatio": 0.2835
+      }
+    },
+    {
+      "id": "scene02",
+      "source": {
+        "width": 1536,
+        "height": 1024,
+        "aspect": 1.5
+      },
+      "background": "content/scene02/background.webp",
+      "subjects": [
+        {
+          "id": "subject-01",
+          "path": "content/scene02/subject-01.png",
+          "box": {
+            "x": 0.40234375,
+            "y": 0.2421875,
+            "w": 0.2981770833333333,
+            "h": 0.716796875
+          },
+          "center": {
+            "x": 0.5514322916666666,
+            "y": 0.6005859375
+          },
+          "aspect": 0.624,
+          "areaRatio": 0.1202,
+          "pixelCount": 189050,
+          "size": [
+            458,
+            734
+          ]
+        }
+      ],
+      "provider": "colorkey",
+      "generatedAt": "2026-09-20T16:19:31+08:00",
+      "backgroundColor": [
+        225,
+        218,
+        218
+      ],
+      "confidence": "medium",
+      "metrics": {
+        "thresholdUsed": 36.0,
+        "thresholdFloor": 14.0,
+        "adaptiveTriggered": true,
+        "borderBandP": 36.0,
+        "chromaGateUsed": true,
+        "contrastMargin": 1.583,
+        "rawForegroundRatio": 0.1225
+      }
+    }
+  ],
+  "diagnostics": {
+    "scene01": [
+      "背景色估计 RGB=(243, 243, 245)",
+      "背景距离: 中位 3.0 / 95分位 87.0",
+      "背景较均匀（边框带 p95=4），使用固定阈值 14",
+      "原始前景占比 28.35%",
+      "连通域: 1 个",
+      "连通域 #1 检测到腰部，拆成 5 个主体",
+      "置信度 high（对比裕度 3.79）",
+      "背景已用金字塔扩散填充（抹掉 30.3% 面积）",
+      "背景已做半径 1 的柔化"
+    ],
+    "scene02": [
+      "背景色估计 RGB=(225, 218, 218)",
+      "背景距离: 中位 17.0 / 95分位 66.0",
+      "背景不是纯色（边框带 p95=36）—— 阈值 14 → 自适应 36",
+      "启用色度门：色度向量偏离背景 >8（背景色度 (7,0)，补回 3.41% 面积）",
+      "原始前景占比 12.25%",
+      "连通域: 99 个",
+      "丢弃 98 个面积不足的小连通域（阈值 6291px）",
+      "⚠️ 背景非均匀 —— 色键控的可靠性下降。请打开 generated/report.html 核对掩码；若主体有明显缺失，改用 --provider rembg 或 input/masks/ 手工掩码。",
+      "置信度 medium（对比裕度 1.58）",
+      "背景已用金字塔扩散填充（抹掉 12.5% 面积）",
+      "背景已做半径 1 的柔化"
+    ]
+  }
+}

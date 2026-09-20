@@ -1,0 +1,1074 @@
+{
+ "_note": "素材分组索引。只有 3D 场景层（kind=3d-scene）能按章节可靠归类 —— 因为只有它的文件名带章节名。Rive 图集层与功能卡片层是按别的维度组织的，强行映射到滚动章节会是编造。详见本文件生成脚本 tools/build_scene_map.py 的头部说明。",
+ "source": "https://www.shopify.com/editions/winter2026",
+ "generated": "2026-09-20T00:15:26",
+ "total_files": 748,
+ "total_bytes": 373014938,
+ "scene_layer_count": 14,
+ "groups": {
+  "rive": {
+   "label": "Rive 图集（@rive-app/webgl2 用的纹理集，与章节无关）",
+   "kind": "layer",
+   "count": 314,
+   "bytes": 16958450,
+   "files": {
+    "images": [
+     "images/rive_U113_1.webp",
+     "images/rive_U113_2.webp",
+     "images/rive_U113_3.webp",
+     "images/rive_U113_4.webp",
+     "images/rive_U113_5.webp",
+     "images/rive_U113_6.webp",
+     "images/rive_U113_7.webp",
+     "images/rive_U113_8.webp",
+     "images/rive_U15_10.webp",
+     "images/rive_U15_3-desktop.webp",
+     "images/rive_U15_3-mobile.webp",
+     "images/rive_U15_4-desktop.webp",
+     "images/rive_U15_4-mobile.webp",
+     "images/rive_U15_6-desktop.webp",
+     "images/rive_U15_6-mobile.webp",
+     "images/rive_U15_7-desktop.webp",
+     "images/rive_U15_7-mobile.webp",
+     "images/rive_U15_8-desktop.webp",
+     "images/rive_U15_8-mobile.webp",
+     "images/rive_U15_9.webp",
+     "images/rive_apps_1-desktop.webp",
+     "images/rive_apps_1-mobile.webp",
+     "images/rive_apps_2-desktop.webp",
+     "images/rive_apps_2-mobile.webp",
+     "images/rive_apps_3-desktop.webp",
+     "images/rive_apps_3-mobile.webp",
+     "images/rive_apps_4-desktop.webp",
+     "images/rive_apps_4-mobile.webp",
+     "images/rive_apps_5-desktop.webp",
+     "images/rive_apps_5-mobile.webp",
+     "images/rive_apps_6-desktop.webp",
+     "images/rive_apps_6-mobile.webp",
+     "images/rive_devDash_1-desktop.webp",
+     "images/rive_devDash_1-mobile.webp",
+     "images/rive_devDash_10.webp",
+     "images/rive_devDash_11.webp",
+     "images/rive_devDash_12.webp",
+     "images/rive_devDash_13-desktop.webp",
+     "images/rive_devDash_13-mobile.webp",
+     "images/rive_devDash_14-desktop.webp",
+     "images/rive_devDash_14-mobile.webp",
+     "images/rive_devDash_15-desktop.webp",
+     "images/rive_devDash_15-mobile.webp",
+     "images/rive_devDash_16-desktop.webp",
+     "images/rive_devDash_16-mobile.webp",
+     "images/rive_devDash_2-desktop.webp",
+     "images/rive_devDash_2-mobile.webp",
+     "images/rive_devDash_3-desktop.webp",
+     "images/rive_devDash_3-mobile.webp",
+     "images/rive_devDash_4-desktop.webp",
+     "images/rive_devDash_4-mobile.webp",
+     "images/rive_devDash_5-desktop.webp",
+     "images/rive_devDash_5-mobile.webp",
+     "images/rive_devDash_6-desktop.webp",
+     "images/rive_devDash_6-mobile.webp",
+     "images/rive_devDash_7-desktop.webp",
+     "images/rive_devDash_7-mobile.webp",
+     "images/rive_devDash_8-desktop.webp",
+     "images/rive_devDash_8-mobile.webp",
+     "images/rive_devDash_9-desktop.webp",
+     "images/rive_devDash_9-mobile.webp",
+     "images/rive_digest_1-desktop.webp",
+     "images/rive_digest_1-mobile.webp",
+     "images/rive_digest_10-desktop.webp",
+     "images/rive_digest_10-mobile.webp",
+     "images/rive_digest_11-desktop.webp",
+     "images/rive_digest_11-mobile.webp",
+     "images/rive_digest_2-desktop.webp",
+     "images/rive_digest_2-mobile.webp",
+     "images/rive_digest_3-desktop.webp",
+     "images/rive_digest_3-mobile.webp",
+     "images/rive_digest_4-desktop.webp",
+     "images/rive_digest_4-mobile.webp",
+     "images/rive_digest_5-desktop.webp",
+     "images/rive_digest_5-mobile.webp",
+     "images/rive_digest_6-desktop.webp",
+     "images/rive_digest_6-mobile.webp",
+     "images/rive_digest_7-desktop.webp",
+     "images/rive_digest_7-mobile.webp",
+     "images/rive_digest_8-desktop.webp",
+     "images/rive_digest_8-mobile.webp",
+     "images/rive_digest_9-desktop.webp",
+     "images/rive_digest_9-mobile.webp",
+     "images/rive_flow_1-desktop.webp",
+     "images/rive_flow_1-mobile.webp",
+     "images/rive_flow_2-desktop.webp",
+     "images/rive_flow_2-mobile.webp",
+     "images/rive_flow_3-desktop.webp",
+     "images/rive_flow_3-mobile.webp",
+     "images/rive_flow_4-desktop.webp",
+     "images/rive_flow_4-mobile.webp",
+     "images/rive_rollouts_1-desktop.webp",
+     "images/rive_rollouts_1-mobile.webp",
+     "images/rive_rollouts_10-desktop.webp",
+     "images/rive_rollouts_10-mobile.webp",
+     "images/rive_rollouts_11-desktop.webp",
+     "images/rive_rollouts_11-mobile.webp",
+     "images/rive_rollouts_12-desktop.webp",
+     "images/rive_rollouts_12-mobile.webp",
+     "images/rive_rollouts_13-desktop.webp",
+     "images/rive_rollouts_13-mobile.webp",
+     "images/rive_rollouts_14-desktop.webp",
+     "images/rive_rollouts_14-mobile.webp",
+     "images/rive_rollouts_2-desktop.webp",
+     "images/rive_rollouts_2-mobile.webp",
+     "images/rive_rollouts_3-desktop.webp",
+     "images/rive_rollouts_3-mobile.webp",
+     "images/rive_rollouts_4-desktop.webp",
+     "images/rive_rollouts_4-mobile.webp",
+     "images/rive_rollouts_5-desktop.png",
+     "images/rive_rollouts_5-mobile.png",
+     "images/rive_rollouts_6-desktop.webp",
+     "images/rive_rollouts_6-mobile.webp",
+     "images/rive_rollouts_7-desktop.webp",
+     "images/rive_rollouts_7-mobile.webp",
+     "images/rive_rollouts_8-desktop.webp",
+     "images/rive_rollouts_8-mobile.webp",
+     "images/rive_rollouts_9-desktop.webp",
+     "images/rive_rollouts_9-mobile.webp",
+     "images/rive_simGym_1-desktop.webp",
+     "images/rive_simGym_1-mobile.webp",
+     "images/rive_simGym_10-desktop.webp",
+     "images/rive_simGym_10-mobile.webp",
+     "images/rive_simGym_11-desktop.webp",
+     "images/rive_simGym_11-mobile.webp",
+     "images/rive_simGym_12-desktop.webp",
+     "images/rive_simGym_12-mobile.webp",
+     "images/rive_simGym_13-desktop.webp",
+     "images/rive_simGym_13-mobile.webp",
+     "images/rive_simGym_14-desktop.webp",
+     "images/rive_simGym_14-mobile.webp",
+     "images/rive_simGym_15-desktop.webp",
+     "images/rive_simGym_15-mobile.webp",
+     "images/rive_simGym_16-desktop.webp",
+     "images/rive_simGym_16-mobile.webp",
+     "images/rive_simGym_17-desktop.webp",
+     "images/rive_simGym_17-mobile.webp",
+     "images/rive_simGym_18-desktop.webp",
+     "images/rive_simGym_18-mobile.webp",
+     "images/rive_simGym_19-desktop.webp",
+     "images/rive_simGym_19-mobile.webp",
+     "images/rive_simGym_2-desktop.webp",
+     "images/rive_simGym_2-mobile.webp",
+     "images/rive_simGym_20-desktop.webp",
+     "images/rive_simGym_20-mobile.webp",
+     "images/rive_simGym_21-desktop.webp",
+     "images/rive_simGym_21-mobile.webp",
+     "images/rive_simGym_22-desktop.webp",
+     "images/rive_simGym_22-mobile.webp",
+     "images/rive_simGym_25-desktop.webp",
+     "images/rive_simGym_25-mobile.webp",
+     "images/rive_simGym_26-desktop.webp",
+     "images/rive_simGym_26-mobile.webp",
+     "images/rive_simGym_27-desktop.webp",
+     "images/rive_simGym_27-mobile.webp",
+     "images/rive_simGym_3-desktop.webp",
+     "images/rive_simGym_3-mobile.webp",
+     "images/rive_simGym_4-desktop.webp",
+     "images/rive_simGym_4-mobile.webp",
+     "images/rive_simGym_5-desktop.webp",
+     "images/rive_simGym_5-mobile.webp",
+     "images/rive_simGym_6-desktop.webp",
+     "images/rive_simGym_6-mobile.webp",
+     "images/rive_simGym_7-desktop.webp",
+     "images/rive_simGym_7-mobile.webp",
+     "images/rive_simGym_8-desktop.webp",
+     "images/rive_simGym_8-mobile.webp",
+     "images/rive_simGym_9-desktop.webp",
+     "images/rive_simGym_9-mobile.webp",
+     "images/rive_theme_1-desktop.webp",
+     "images/rive_theme_1-mobile.webp",
+     "images/rive_theme_10-desktop.webp",
+     "images/rive_theme_10-mobile.webp",
+     "images/rive_theme_11-desktop.webp",
+     "images/rive_theme_11-mobile.webp",
+     "images/rive_theme_12-desktop.webp",
+     "images/rive_theme_12-mobile.webp",
+     "images/rive_theme_13-desktop.webp",
+     "images/rive_theme_13-mobile.webp",
+     "images/rive_theme_2-desktop.webp",
+     "images/rive_theme_2-mobile.webp",
+     "images/rive_theme_3-desktop.webp",
+     "images/rive_theme_3-mobile.webp",
+     "images/rive_theme_4-desktop.webp",
+     "images/rive_theme_4-mobile.webp",
+     "images/rive_theme_5-desktop.webp",
+     "images/rive_theme_5-mobile.webp",
+     "images/rive_theme_6-desktop.webp",
+     "images/rive_theme_6-mobile.webp",
+     "images/rive_theme_7-desktop.webp",
+     "images/rive_theme_7-mobile.webp",
+     "images/rive_theme_8-desktop.webp",
+     "images/rive_theme_8-mobile.webp",
+     "images/rive_theme_9-desktop.webp",
+     "images/rive_theme_9-mobile.webp",
+     "images/rive_u132_1-desktop.webp",
+     "images/rive_u132_1-mobile.webp",
+     "images/rive_u132_2-desktop.webp",
+     "images/rive_u132_2-mobile.webp",
+     "images/rive_u132_3-desktop.webp",
+     "images/rive_u132_3-mobile.webp",
+     "images/rive_u132_4-desktop.webp",
+     "images/rive_u132_4-mobile.webp",
+     "images/rive_u151_1-desktop.webp",
+     "images/rive_u151_1-mobile.webp",
+     "images/rive_u151_10-desktop.webp",
+     "images/rive_u151_10-mobile.webp",
+     "images/rive_u151_11-desktop.webp",
+     "images/rive_u151_11-mobile.webp",
+     "images/rive_u151_12-desktop.webp",
+     "images/rive_u151_12-mobile.webp",
+     "images/rive_u151_13-desktop.webp",
+     "images/rive_u151_13-mobile.webp",
+     "images/rive_u151_14-desktop.webp",
+     "images/rive_u151_14-mobile.webp",
+     "images/rive_u151_15-desktop.webp",
+     "images/rive_u151_15-mobile.webp",
+     "images/rive_u151_16-desktop.webp",
+     "images/rive_u151_16-mobile.webp",
+     "images/rive_u151_17-desktop.webp",
+     "images/rive_u151_17-mobile.webp",
+     "images/rive_u151_18-desktop.webp",
+     "images/rive_u151_18-mobile.webp",
+     "images/rive_u151_19-desktop.webp",
+     "images/rive_u151_19-mobile.webp",
+     "images/rive_u151_2-desktop.webp",
+     "images/rive_u151_2-mobile.webp",
+     "images/rive_u151_20-desktop.webp",
+     "images/rive_u151_20-mobile.webp",
+     "images/rive_u151_21-desktop.webp",
+     "images/rive_u151_21-mobile.webp",
+     "images/rive_u151_22-desktop.png",
+     "images/rive_u151_22-mobile.png",
+     "images/rive_u151_23-desktop.png",
+     "images/rive_u151_23-mobile.png",
+     "images/rive_u151_24-desktop.png",
+     "images/rive_u151_24-mobile.png",
+     "images/rive_u151_25-desktop.png",
+     "images/rive_u151_25-mobile.png",
+     "images/rive_u151_3-desktop.webp",
+     "images/rive_u151_3-mobile.webp",
+     "images/rive_u151_4-desktop.webp",
+     "images/rive_u151_4-mobile.webp",
+     "images/rive_u151_5-desktop.webp",
+     "images/rive_u151_5-mobile.webp",
+     "images/rive_u151_6-desktop.webp",
+     "images/rive_u151_6-mobile.webp",
+     "images/rive_u151_7-desktop.webp",
+     "images/rive_u151_7-mobile.webp",
+     "images/rive_u151_8-desktop.webp",
+     "images/rive_u151_8-mobile.webp",
+     "images/rive_u151_9-desktop.webp",
+     "images/rive_u151_9-mobile.webp",
+     "images/rive_u50_1-desktop.webp",
+     "images/rive_u50_1-mobile.webp",
+     "images/rive_u50_2-desktop.webp",
+     "images/rive_u50_2-mobile.webp",
+     "images/rive_u50_3-desktop.webp",
+     "images/rive_u50_3-mobile.webp",
+     "images/rive_u50_4-desktop.webp",
+     "images/rive_u50_4-mobile.webp",
+     "images/rive_u50_5-desktop.webp",
+     "images/rive_u50_5-mobile.webp",
+     "images/rive_u50_6-desktop.webp",
+     "images/rive_u50_6-mobile.webp",
+     "images/rive_u50_7-desktop.webp",
+     "images/rive_u50_7-mobile.webp",
+     "images/rive_u50_8-desktop.webp",
+     "images/rive_u50_8-mobile.webp",
+     "images/rive_u5_1-desktop.webp",
+     "images/rive_u5_1-mobile.webp",
+     "images/rive_u6_3.webp",
+     "images/rive_u82_1-desktop.webp",
+     "images/rive_u82_1-mobile.webp",
+     "images/rive_u82_10-desktop.webp",
+     "images/rive_u82_10-mobile.webp",
+     "images/rive_u82_11-desktop.webp",
+     "images/rive_u82_11-mobile.webp",
+     "images/rive_u82_12-desktop.webp",
+     "images/rive_u82_12-mobile.webp",
+     "images/rive_u82_13-desktop.webp",
+     "images/rive_u82_13-mobile.webp",
+     "images/rive_u82_14-desktop.webp",
+     "images/rive_u82_14-mobile.webp",
+     "images/rive_u82_15-desktop.webp",
+     "images/rive_u82_15-mobile.webp",
+     "images/rive_u82_16-desktop.webp",
+     "images/rive_u82_16-mobile.webp",
+     "images/rive_u82_17-desktop.webp",
+     "images/rive_u82_17-mobile.webp",
+     "images/rive_u82_18-desktop.webp",
+     "images/rive_u82_18-mobile.webp",
+     "images/rive_u82_19-desktop.webp",
+     "images/rive_u82_19-mobile.webp",
+     "images/rive_u82_2-desktop.webp",
+     "images/rive_u82_2-mobile.webp",
+     "images/rive_u82_3-desktop.webp",
+     "images/rive_u82_3-mobile.webp",
+     "images/rive_u82_4-desktop.webp",
+     "images/rive_u82_4-mobile.webp",
+     "images/rive_u82_5-desktop.webp",
+     "images/rive_u82_5-mobile.webp",
+     "images/rive_u82_6-desktop.webp",
+     "images/rive_u82_6-mobile.webp",
+     "images/rive_u82_7-desktop.webp",
+     "images/rive_u82_7-mobile.webp",
+     "images/rive_u82_8-desktop.webp",
+     "images/rive_u82_8-mobile.webp",
+     "images/rive_u82_9-desktop.webp",
+     "images/rive_u82_9-mobile.webp",
+     "images/rive_u8_1-desktop.webp",
+     "images/rive_u8_1-mobile.webp",
+     "images/rive_u8_2-desktop.webp",
+     "images/rive_u8_2-mobile.webp"
+    ]
+   }
+  },
+  "content-hashed": {
+   "label": "CDN 内容哈希名 —— 文件名无任何语义，无法归类",
+   "kind": "layer",
+   "count": 125,
+   "bytes": 125678273,
+   "files": {
+    "fonts": [
+     "fonts/389d4f8566b3b9cbe083b682c7fabf06.woff2",
+     "fonts/3ee238256136fcfdfca35decbd44d0d4.woff2",
+     "fonts/49a57a6e59f6a50f0627418abeb58fec.woff2"
+    ],
+    "images": [
+     "images/03cf615f7c023dd5afc16904b8e4b619.png",
+     "images/0dfe781a187d48cfa581ed2b1ad6a5ed.thumbnail.0000000000.jpg",
+     "images/1a10e8fb22411e7ae54bedde20ff1ec5.png",
+     "images/1bf084da109bb3fe83016948c3c88b1f.png",
+     "images/228361bfc05b3d2c5260a542aa8c61c6.png",
+     "images/26605fc719dba38d9d2a5da83312810f.png",
+     "images/2ace8284aebc4d22901886b2323bb20d.thumbnail.0000000000.jpg",
+     "images/2ec3c3abe46eb728b0f37a9e09348011.png",
+     "images/3c99cfd21a3a19f095a10ee6ca179ee6.png",
+     "images/3fb74ac5ef61aeaa88b78374d3b1ab19.png",
+     "images/5aa1f17e22044052af94fde4bb1d052c.thumbnail.0000000000.jpg",
+     "images/5b3c2862e3c5dcf950d0b912867ebdeb.png",
+     "images/620a0d8735da4d97b040b1cd98693898.thumbnail.0000000000.jpg",
+     "images/6f0d7e6128d962253121b3aec1527854.png",
+     "images/786dd1f1b8096bb6116dcbf0fe12893a.png",
+     "images/8459c49d89c64442b37598a6155ae301.thumbnail.0000000000.jpg",
+     "images/92261b18c8eb7e532e60f23ee5682d04.png",
+     "images/a230ba237d7a6d736a1ce46b084a41c6.png",
+     "images/c9c913c72ba45ce34cb2521bcaaefd07.png",
+     "images/def37b82d2b5486a87cbf297a896f7d4.thumbnail.0000000000.jpg",
+     "images/ea4f03d63cda2a71afb54dfb50894df8.png",
+     "images/f7d363fc85e5562586d25e7b50669ae5.png",
+     "images/f880db5d8462441482ecbc2437cacf5d.thumbnail.0000000000.jpg"
+    ],
+    "video": [
+     "video/01d00868b512c9a04e37fd4600f5d80d.webm",
+     "video/043fe6052c351992ce1d3783dee3888f.webm",
+     "video/06b2b144327d78b9d0dab5c3e82c56dd.webm",
+     "video/0d598682dd2df197996396cde1bb1c6d.mp4",
+     "video/0dfe781a187d48cfa581ed2b1ad6a5ed.HD-1080p-2.5Mbps-64844032.mp4",
+     "video/0dfe781a187d48cfa581ed2b1ad6a5ed.HD-720p-1.6Mbps-64844032.mp4",
+     "video/0dfe781a187d48cfa581ed2b1ad6a5ed.SD-480p-0.9Mbps-64844032.mp4",
+     "video/126c9ae0be1a68f37ef44481e83cedfc.mp4",
+     "video/17350d40ea9a19f836f1fdcec02b8ae0.mp4",
+     "video/1789159c56fc8e6c558fd5212d71a7f2.webm",
+     "video/196970a0409aab947f8336920113f8a3.mp4",
+     "video/21e5a544ef9caee113d3f81dd53f9f47.mp4",
+     "video/2608aba5b58194e499ad1fff0d06eb3c.webm",
+     "video/2ace8284aebc4d22901886b2323bb20d.HD-1080p-2.5Mbps-64843973.mp4",
+     "video/2ace8284aebc4d22901886b2323bb20d.HD-720p-1.6Mbps-64843973.mp4",
+     "video/2ace8284aebc4d22901886b2323bb20d.SD-480p-0.9Mbps-64843973.mp4",
+     "video/2fbe5e89199e1f7ae50f83a17e95314e.webm",
+     "video/33f83e563abbc54bb5a9af6ecc473901.webm",
+     "video/36c19199093173f378c64fa38090c7c2.webm",
+     "video/39030044140f40eccae29a79791044f4.webm",
+     "video/3cab5c2925265e9ca4189a29941414c9.mp4",
+     "video/3fffe07efae332779d1d49cab33ff14c.webm",
+     "video/494267605d8145b0f01e84cf8d0c11c7.webm",
+     "video/495da7f4daa9b60b329e517a53df02e9.mp4",
+     "video/4c93e5423de40409e383951066e9e778.webm",
+     "video/4d3c41f335b4b4b8be016f9693161163.webm",
+     "video/4db3219bcc8e0eff0766af51145dbe00.webm",
+     "video/56e9b9709510a4b34189d24e53749032.webm",
+     "video/59717a03d4acc1e6c71d00d972ae5ede.webm",
+     "video/5aa1f17e22044052af94fde4bb1d052c.HD-1080p-2.5Mbps-64843660.mp4",
+     "video/5aa1f17e22044052af94fde4bb1d052c.HD-720p-1.6Mbps-64843660.mp4",
+     "video/5aa1f17e22044052af94fde4bb1d052c.SD-480p-0.9Mbps-64843660.mp4",
+     "video/5c15386e1ac48f8662d52ed2aa2692c3.mp4",
+     "video/5cb298eff1d2a54a9a7693946cc0ae19.mp4",
+     "video/620a0d8735da4d97b040b1cd98693898.HD-1080p-2.5Mbps-64843815.mp4",
+     "video/620a0d8735da4d97b040b1cd98693898.HD-720p-1.6Mbps-64843815.mp4",
+     "video/620a0d8735da4d97b040b1cd98693898.SD-480p-0.9Mbps-64843815.mp4",
+     "video/67dcc7416b49086d020c650531a6ed12.mp4",
+     "video/69216783af520c62a694a6c905100c59.mp4",
+     "video/6a74605d556064570bdd3bdb5befa8a7.mp4",
+     "video/6bf98c66a2a2b284ece7c7b56e7f0463.webm",
+     "video/78603564f6951334ae4a55f529d39f43.mp4",
+     "video/78af3d40bf7342bd7e04c3a7df194a98.mp4",
+     "video/7f07581cc83df398399dfb48b11dc743.mp4",
+     "video/7f26072f01ea5c72c658851866dde832.mp4",
+     "video/82ae8cc017937429bb615a203797da83.mp4",
+     "video/82f612ec4a4574bc7949c1758c1d02e3.mp4",
+     "video/837faa312f7d981e0bd127b390115fae.webm",
+     "video/8459c49d89c64442b37598a6155ae301.HD-720p-4.5Mbps-64727629.mp4",
+     "video/8459c49d89c64442b37598a6155ae301.SD-480p-1.5Mbps-64727629.mp4",
+     "video/89ddb7146a8536f8ba5e2ad70b7ef6f7.webm",
+     "video/8eab8e5ddc95d68b9daa71eb5e5c757c.webm",
+     "video/9000754bbebd6228af69b2b5d77f779a.webm",
+     "video/938e029e346b9242caaa10713143af34.mp4",
+     "video/968d5dca276adf30b6aedf01e125fb60.webm",
+     "video/96e2f7088b7d57652bd2a3ce1f047877.webm",
+     "video/98fc2c4d347cbd4d8dc165280d891008.mp4",
+     "video/9ae7512f4f43c706de82716d53362942.webm",
+     "video/a20d64a768e729d0a45a974c9cbb494e.mp4",
+     "video/a271c6d4c863a59d78660303badcafe7.webm",
+     "video/a2d2418242ede77347dad94175690815.mp4",
+     "video/a3f9aec4de6274bb90036fc640b720ca.mp4",
+     "video/a6f1fd383fe2127e9926d1f00a35044a.mp4",
+     "video/aa10848227f17c1f0ae086225f8e6eca.webm",
+     "video/aa20f770edb814a1e8b60c0b378b8bc0.webm",
+     "video/aaa1dba50c78f8cf63994d53ee1e8568.mp4",
+     "video/ac7da46d026328273955e8aad80962fc.mp4",
+     "video/b201bb23d69f4a748de0ad9a500f4d4c.mp4",
+     "video/b41c10619fd54ae329021cbfcee10c3b.mp4",
+     "video/b838a0a9b4727e9c0622f8bd88237b02.webm",
+     "video/bbb0a1ddcf79501cf400b0db6c7d3f96.mp4",
+     "video/bc0a9638ef8ac043669da964fefbf5c8.mp4",
+     "video/bfcb9099d302fe272448a4fe09c10e87.webm",
+     "video/c289c80ca4a475f2010738ccf897639e.webm",
+     "video/c31b4a306a9e811f2a8e7f84ce86e761.mp4",
+     "video/c8bb84dbbd2266b09d9f6811dd77cb34.webm",
+     "video/c8e39ff475f8e8153b234080e162cb6b.webm",
+     "video/d691920898948eba75f931fc0357d2b5.webm",
+     "video/deb94092d05eef867322115bd88720aa.webm",
+     "video/def37b82d2b5486a87cbf297a896f7d4.HD-1080p-7.2Mbps-64727252.mp4",
+     "video/def37b82d2b5486a87cbf297a896f7d4.HD-720p-4.5Mbps-64727252.mp4",
+     "video/def37b82d2b5486a87cbf297a896f7d4.SD-480p-1.5Mbps-64727252.mp4",
+     "video/df2369708a496fd21fe60390e9b17c76.mp4",
+     "video/e1593488f220dd98046751f716a5fd54.mp4",
+     "video/e32782c4c2c375e9c78d5910b0511c1c.webm",
+     "video/e8bcdcea7dd10f8122cf04c7f1671e5d.webm",
+     "video/ea1a577540dbceea63e07f932d84bd1e.mp4",
+     "video/ec217b5f4f15f27c58660dd6ceebea69.mp4",
+     "video/ee86942ef07c61e340e3a0512676a0a0.mp4",
+     "video/f144ad9dc480df6213915c7fb5126710.mp4",
+     "video/f432eaf126784e728aa25730b1e8fb72.HD-720p-4.5Mbps-64523923.mp4",
+     "video/f432eaf126784e728aa25730b1e8fb72.SD-480p-1.5Mbps-64523923.mp4",
+     "video/f4b8390ee315ae07a490ecd4dc3f6137.webm",
+     "video/f72a0f02760d1106064f2f401ba0761d.webm",
+     "video/f880db5d8462441482ecbc2437cacf5d.HD-1080p-2.5Mbps-64884899.mp4",
+     "video/f880db5d8462441482ecbc2437cacf5d.HD-720p-1.6Mbps-64884899.mp4",
+     "video/f880db5d8462441482ecbc2437cacf5d.SD-480p-0.9Mbps-64884899.mp4",
+     "video/fc31d019910f7bc9d78ea9a954fe6e40.mp4",
+     "video/fefcb83ba2552c7dd72205ade02897ca.mp4"
+    ]
+   }
+  },
+  "mobile-fallback": {
+   "label": "移动端兜底图（12 张，与章节无关）",
+   "kind": "layer",
+   "count": 61,
+   "bytes": 51495874,
+   "files": {
+    "images": [
+     "images/Checkout_Fallback_251209.jpg",
+     "images/Fallback_Mobile_Agentic_2x_ed265a10-0482-41f0-88a1-2be1a5b94ffc.jpg",
+     "images/Fallback_Mobile_B2B_2x_1353d91d-00eb-455e-bafb-18762b0240cb.jpg",
+     "images/Fallback_Mobile_Checkout_2x_3d90b8e1-3861-4d8e-975c-53c1adfbff04.jpg",
+     "images/Fallback_Mobile_Developer_2x_a0cdd077-d691-4a02-888a-2641d7cc1c6f.jpg",
+     "images/Fallback_Mobile_Finance_2x_7fce0bd0-4a7b-4811-8eb9-a51d52fd357b.jpg",
+     "images/Fallback_Mobile_Marketing_2x_9bdae360-044d-4e84-a72c-19df76beae85.jpg",
+     "images/Fallback_Mobile_Online_2x_19548bd3-08de-48b3-a780-e47cbf3fbf64.jpg",
+     "images/Fallback_Mobile_Operation_2x_db6348e7-2481-4c47-9a8b-076bb53775c3.jpg",
+     "images/Fallback_Mobile_Retail_2x_0adf909c-56a2-4df2-89c7-a8c53dfc4d85.jpg",
+     "images/Fallback_Mobile_Shipping_2x_20393750-bbde-4f1f-ba88-24517c3ade74.jpg",
+     "images/Fallback_Mobile_Shopapp_2x_9bda6267-e34e-470a-b8ff-7749b27e65bc.jpg",
+     "images/Fallback_Mobile_Sidekick_2x_ae10922b-27e9-4a86-ac5d-24de7957ea02.jpg",
+     "images/Finance_Fallback.jpg",
+     "images/Marketing_Fallback.jpg",
+     "images/Online_Fallback.jpg",
+     "images/Operations_Fallback.jpg",
+     "images/Shipping_Fallback.jpg",
+     "images/Shop_app_Fallback.jpg",
+     "images/Sidekick_Fallback.jpg",
+     "images/U132_Quick_sale_in_Shopify_Mobile_mobile-fallback_06e42a0e-a477-4848-b7fa-760ac275943a.png",
+     "images/U151_Personalized_Shop_storefronts_mobile-fallback_36563654-7887-4241-8439-deef7a4fbac5.png",
+     "images/U153_Offers_in_Shop_mobile-fallback.png",
+     "images/U158_Automated_transfers_for_Shopify_Balance_payouts_mobile-fallback.png",
+     "images/U163_Spend_controls_cardholders_for_Balance_mobile-fallback.png",
+     "images/U16_Sidekick_edits_email_sections_mobile-fallback.png",
+     "images/U1_sidekick_flow_desktop-fallback.png",
+     "images/U1_sidekick_flow_mobile-fallback.png",
+     "images/U20_Pulse_desktop-fallback.png",
+     "images/U20_Pulse_mobile-fallback.png",
+     "images/U258_SimGym_desktop-fallback.png",
+     "images/U258_SimGym_mobile-fallback.png",
+     "images/U270_DevDash_desktop-mobile-fallback.png",
+     "images/U3_Sidekick_Theme_edit_desktop-fallback.png",
+     "images/U3_Sidekick_Theme_edit_mobile-fallback.png",
+     "images/U47_Theme_index_on_mobile_mobile-fallback.png",
+     "images/U53_Quick_count_POS_extension_mobile-fallback.png",
+     "images/U62_Uber_Direct_POS_local_mobile-fallback.png",
+     "images/U6_Sidekick_file_editor_mobile-fallback.png",
+     "images/U97_Rollouts_desktop-fallback_de.png",
+     "images/U97_Rollouts_mobile-fallback_de.png",
+     "images/U98_Search_and_filter_segmentation_templates_mobile-fallback.png",
+     "images/compressed-Fallback-Retail-Frame1-Desktop.webp",
+     "images/compressed-Fallback-Retail-Frame2-Desktop.webp",
+     "images/compressed-Fallback-Retail-Frame2-Mobile.webp",
+     "images/compressed-Fallback-Retail-Frame3-Mobile.webp",
+     "images/herofallback.jpg",
+     "images/portrait-hero-test-fallback.jpg"
+    ],
+    "textures": [
+     "textures/Fallback_Mobile_Agentic_2x.ktx2",
+     "textures/Fallback_Mobile_B2B_2x.ktx2",
+     "textures/Fallback_Mobile_Checkout_2x.ktx2",
+     "textures/Fallback_Mobile_Developer_2x.ktx2",
+     "textures/Fallback_Mobile_Finance_2x.ktx2",
+     "textures/Fallback_Mobile_Hero_2x.ktx2",
+     "textures/Fallback_Mobile_Marketing_2x.ktx2",
+     "textures/Fallback_Mobile_Online_2x.ktx2",
+     "textures/Fallback_Mobile_Operation_2x.ktx2",
+     "textures/Fallback_Mobile_Retail_2x.ktx2",
+     "textures/Fallback_Mobile_Shipping_2x.ktx2",
+     "textures/Fallback_Mobile_Shopapp_2x.ktx2",
+     "textures/Fallback_Mobile_Sidekick_2x.ktx2"
+    ]
+   }
+  },
+  "unclassified": {
+   "label": "未归类",
+   "kind": "layer",
+   "count": 49,
+   "bytes": 14872357,
+   "files": {
+    "data": [
+     "data/B2BScene.theatre-project-state_4.json",
+     "data/HeroScene.theatre-project-state_15.json",
+     "data/OnlineScene.theatre-project-state_1_5a646934-a79e-49ac-80a9-825d8a3fb221.json"
+    ],
+    "images": [
+     "images/251201-W26-ProductNetwork-Preroroll_92123bfc-8331-4763-958d-c5ddf6562248.png",
+     "images/B4.png",
+     "images/CloseX16.svg",
+     "images/Editions-Winter-25-compressed.svg",
+     "images/Editions_Summer_22.svg",
+     "images/Editions_Summer_23.svg",
+     "images/Editions_Summer_24.svg",
+     "images/Editions_Winter_23.svg",
+     "images/Editions_Winter_24.svg",
+     "images/Global_2x_b0f402bc-a812-47e6-b3eb-f08c3aa4f7d1.jpg",
+     "images/Line_Grid-tablet.svg",
+     "images/Line_Grid.svg",
+     "images/Rectangle_240654805.png",
+     "images/Rectangle_240657548.jpg",
+     "images/Summer2025.svg",
+     "images/apps-bg-image.png",
+     "images/cloud.svg",
+     "images/connectivity_15bc343f-0942-4223-b315-d760c4e83562.svg",
+     "images/default_abdd996f-1b4e-44a5-bfcc-8addca857894.png",
+     "images/default_be7aaa86-31c5-433d-aae2-5b361372ccc6.png",
+     "images/default_ee658e76-0d9b-46c9-b479-5baab424fb97.png",
+     "images/emoji1.png",
+     "images/emoji2.png",
+     "images/emoji3.png",
+     "images/emoji4.png",
+     "images/emoji5.png",
+     "images/emoji6.png",
+     "images/emoji7.png",
+     "images/en_3a493a1f-2575-43b6-9e6e-22033556b139.png",
+     "images/en_4608c98d-d4f7-4d35-8b94-e83258e20e54.png",
+     "images/en_a158fbbf-7e97-4014-9008-9eb7a719f84a.png",
+     "images/equirectangular_map.webp",
+     "images/fav-180.png",
+     "images/flowerbg-2.png",
+     "images/global-16-arrow-diagonal.svg",
+     "images/global-16-search.svg",
+     "images/global-16-shrevon-down.svg",
+     "images/global-24-external-link.svg",
+     "images/global-24-menu.svg",
+     "images/health.svg",
+     "images/iphonebezelnoisland-mobile.webp",
+     "images/mfi.svg",
+     "images/packed_dirt_normal_map.jpg",
+     "images/ren-anton.png",
+     "images/texture-src-90.jpg"
+    ],
+    "textures": [
+     "textures/antonkolisnyk_painting_of_forest_and_flowers_by_Sandro_Botticel-optimized_108cf678-3833-449b-9a1a-cf7f5e18324c.ktx2"
+    ]
+   }
+  },
+  "feature-card": {
+   "label": "功能卡片配图（按功能组织，不按滚动章节）",
+   "kind": "layer",
+   "count": 44,
+   "bytes": 48709932,
+   "files": {
+    "images": [
+     "images/U109_Forms_translations.png",
+     "images/U113_Shop_campaigns_b91abd7b-cce5-4609-8d43-051fce88982d.png",
+     "images/U117_FedEx_One_Rate_Return_Labels_6-col.png",
+     "images/U122_Variant_default_packaging.png",
+     "images/U132_Quick_sale_in_Shopify_Mobile_fd663056-4f60-4747-920f-e1b1d890383e.png",
+     "images/U133_Apple_watch_app_redesign.png",
+     "images/U143_Flexible_inventory_transfers.png",
+     "images/U151_Personalized_Shop_storefronts.png",
+     "images/U153_Offers_in_Shop.png",
+     "images/U158_Automated_transfers_for_Shopify_Balance_payouts.png",
+     "images/U163_Spend_controls_secondary_cardholders_for_Balance.png",
+     "images/U172_Capital_flex_account_0dc379db-95c4-4986-a8d3-13dfb10563f1.png",
+     "images/U191_Faster_bulk_data_imports.png",
+     "images/U200_Shop_SDK_Minis.png",
+     "images/U223_upgrades_for_metafields.png",
+     "images/U229_Admin_Intents_API.png",
+     "images/U230_Wordpress.png",
+     "images/U254_Scanner_support.png",
+     "images/U267_Tangle.png",
+     "images/U37_Integrated_theme_editor.png",
+     "images/U47_Theme_index_on_mobile.png",
+     "images/U50_Unified_Editor.png",
+     "images/U71_Shopify_Collective_globally_available.png",
+     "images/U79_Send_payment_requests_per_fulfillment.png",
+     "images/U95_Shop_Pay_button.png",
+     "images/U98_Search_and_filter_segmentation_templates.png",
+     "images/u16_1-desktop.webp",
+     "images/u16_1-mobile.webp",
+     "images/u200_1_desktop.webp",
+     "images/u200_1_mobile.webp",
+     "images/u200_2_desktop.webp",
+     "images/u200_2_mobile.webp",
+     "images/u200_3_desktop.webp",
+     "images/u200_3_mobile.webp",
+     "images/u6_1_desktop.webp",
+     "images/u6_1_mobile.webp",
+     "images/u6_2_desktop.webp",
+     "images/u6_2_mobile.webp",
+     "images/xxl_chatgpt_handdevice-desktop.webp",
+     "images/xxl_chatgpt_handdevice-mobile.webp",
+     "images/xxl_chatgpt_thumb-desktop.webp",
+     "images/xxl_chatgpt_thumb-mobile.webp",
+     "images/xxl_gpt_1-desktop.webp",
+     "images/xxl_gpt_1-mobile.webp"
+    ]
+   }
+  },
+  "background": {
+   "label": "背景底图",
+   "kind": "layer",
+   "count": 20,
+   "bytes": 21137374,
+   "files": {
+    "images": [
+     "images/BG-3.png",
+     "images/BG-B1.png",
+     "images/BG-B2.png",
+     "images/BG-G.png",
+     "images/BG-R.png",
+     "images/BG-Y.png",
+     "images/u113bg.webp",
+     "images/u132bg.webp",
+     "images/u15bg.webp",
+     "images/u16bg.webp",
+     "images/u172bg.webp",
+     "images/u200bg.webp",
+     "images/u2bg.webp",
+     "images/u50bg.webp",
+     "images/u5bg.webp",
+     "images/u6bg.webp",
+     "images/u7bg.webp",
+     "images/u82bg.webp",
+     "images/u8bg.webp",
+     "images/u95bg.webp"
+    ]
+   }
+  },
+  "sidekick": {
+   "label": "Sidekick —— 冷色科技感",
+   "kind": "3d-scene",
+   "count": 18,
+   "bytes": 20258288,
+   "files": {
+    "data": [
+     "data/SidekickScene.theatre-project-state_14_910d17ff-f5fb-4da0-920e-1b66f8d229b3.json"
+    ],
+    "images": [
+     "images/Sidekick_Preroll.00_00_00_00.Still002.png",
+     "images/U15_Sidekick_navigates.png",
+     "images/U16_Sidekick_edits_email_sections_fe9fa19b-6380-4a68-b0be-20f0043d14a1.png",
+     "images/U226__Sidekick_app_discovery_6b57593c-579c-4a91-84af-7173ff60da83.png",
+     "images/U253_-_App_intents_for_Sidekick.png",
+     "images/U2_Sidekick_help_on_segmentation_filters_4b05de5d-4b12-419d-8d71-9e9b1d6907a3.png",
+     "images/U5_SIdekick_voice_on_mobile.png",
+     "images/U6_Sidekick_file_editor_on_mobile_2e3a4bb2-d153-4fb3-a767-1d81e9d165f7.png",
+     "images/U7_Sidekick_in_Analytics_query_editor_242da8b7-e095-4998-9cc4-6d48fe00fa63.png",
+     "images/sidekick.jpg",
+     "images/sidekick_digest_1-desktop.webp",
+     "images/sidekick_digest_1-mobile.webp"
+    ],
+    "models": [
+     "models/EW26_Sidekick_251207v4_compressed-optimized.glb",
+     "models/EW26_Sidekick_251208_compressed-optimized.glb",
+     "models/EW26_Sidekick_bg_stars-optimized.glb"
+    ],
+    "textures": [
+     "textures/EW26_Sidekick_bg_stars-optimized_89d84022-03c9-4267-bb0f-71a26f688511.ktx2",
+     "textures/Sidekick_desktop.ktx2"
+    ]
+   }
+  },
+  "video-poster": {
+   "label": "视频封面",
+   "kind": "layer",
+   "count": 14,
+   "bytes": 6566241,
+   "files": {
+    "images": [
+     "images/Frame_2085655178.svg",
+     "images/Frame_2085655272.svg",
+     "images/TINKER_PREROLL_FRAME_1.1.1.png",
+     "images/chatgptdesktopposter_12_10.webp",
+     "images/chatgptmobileposter_12_10.webp",
+     "images/compressed-DEV_AI_PREROLL_120925Still001.webp",
+     "images/compressed-pulseDesktopPoster-desktop.webp",
+     "images/compressed-u2poster_12_9.webp",
+     "images/compressed-u8poster_12_9.webp",
+     "images/u15poster.webp",
+     "images/u16poster_desktop.webp",
+     "images/u2poster.webp",
+     "images/u6poster_mobile.png",
+     "images/u7poster_237e1e00-6928-4b92-8c1a-759ee28b2eaf.webp"
+    ]
+   }
+  },
+  "checkout": {
+   "label": "Checkout",
+   "kind": "3d-scene",
+   "count": 10,
+   "bytes": 7260981,
+   "files": {
+    "data": [
+     "data/CheckoutScene.theatre-project-state_13.json"
+    ],
+    "images": [
+     "images/U183_Checkout_for_web_f222b0b3-24d2-4ee2-aff2-ebf8ffb4a766.png",
+     "images/U271_Checkout_MCP.png",
+     "images/U94_Markets_in_the_Checkout.png",
+     "images/checkout.jpg"
+    ],
+    "models": [
+     "models/Checkout_bg_diffuse-optimized.glb",
+     "models/Checkout_fg_smaller_251127_compressed-optimized.glb",
+     "models/EW26_Checkout_251209_compressed-optimized.glb"
+    ],
+    "textures": [
+     "textures/Checkout_bg_diffuse-optimized.ktx2",
+     "textures/Checkout_desktop.ktx2"
+    ]
+   }
+  },
+  "developer": {
+   "label": "Developer",
+   "kind": "3d-scene",
+   "count": 8,
+   "bytes": 3184661,
+   "files": {
+    "data": [
+     "data/DeveloperScene.theatre-project-state_5.json"
+    ],
+    "images": [
+     "images/Property_1_Developer.jpg",
+     "images/developer.jpg"
+    ],
+    "models": [
+     "models/Developer_bg_diffuse-optimized.glb",
+     "models/EW26_Developer_251128_compressed-optimized.glb",
+     "models/EW26_Developer_251207v5_compressed-optimized.glb"
+    ],
+    "textures": [
+     "textures/Developer_bg_diffuse-optimized.ktx2",
+     "textures/Developer_desktop.ktx2"
+    ]
+   }
+  },
+  "marketing": {
+   "label": "Marketing",
+   "kind": "3d-scene",
+   "count": 8,
+   "bytes": 4185381,
+   "files": {
+    "data": [
+     "data/MarketingScene.theatre-project-state_12.json",
+     "data/marketing.json"
+    ],
+    "images": [
+     "images/U105_Shopify_Email_SMS_marketing.png",
+     "images/marketing.jpg"
+    ],
+    "models": [
+     "models/EW26_Marketing_251209v4_compressed-optimized.glb",
+     "models/Marketing_fg_smaller_251127_compressed-optimized.glb"
+    ],
+    "textures": [
+     "textures/Marketing_bg_retouched_v3-optimized.ktx2",
+     "textures/Marketing_desktop.ktx2"
+    ]
+   }
+  },
+  "pos": {
+   "label": "POS（线下零售）",
+   "kind": "3d-scene",
+   "count": 8,
+   "bytes": 11459164,
+   "files": {
+    "images": [
+     "images/U190_pos_extension_storage_dark.png",
+     "images/U49_Sell_subscriptions_POS.png",
+     "images/U53_Quick_count_POS_extension.png",
+     "images/U62_Uber_Direct_POS_local.png",
+     "images/pos_2_compressed.webp",
+     "images/pos_3_compressed.webp"
+    ],
+    "models": [
+     "models/POS_V53_environment_251209v2_compressed-optimized.glb",
+     "models/POS_v53_Hub_251208v2_compressed-optimized.glb"
+    ]
+   }
+  },
+  "agentic": {
+   "label": "Agentic",
+   "kind": "3d-scene",
+   "count": 7,
+   "bytes": 17767094,
+   "files": {
+    "data": [
+     "data/AgenticScene.theatre-project-state.json"
+    ],
+    "images": [
+     "images/AGENTIC_First_Frame.png",
+     "images/Agentic_fg_251207.png"
+    ],
+    "models": [
+     "models/Agentic_fg_251209_compressed-optimized.glb",
+     "models/EW26_Agentic_Props_251209v5_compressed-optimized.glb"
+    ],
+    "textures": [
+     "textures/Agentic_Bg_windowscene-optimized.ktx2",
+     "textures/Agentic_desktop.ktx2"
+    ]
+   }
+  },
+  "operations": {
+   "label": "Operations",
+   "kind": "3d-scene",
+   "count": 7,
+   "bytes": 2050546,
+   "files": {
+    "data": [
+     "data/OperationsScene.theatre-project-state_8.json"
+    ],
+    "images": [
+     "images/operations.jpg"
+    ],
+    "models": [
+     "models/EW26_Operations_251207_compressed-optimized.glb",
+     "models/Operations_bg_diffuse-optimized.glb",
+     "models/Operations_fg_smaller_251127_compressed-optimized.glb"
+    ],
+    "textures": [
+     "textures/Operations_bg_diffuse-optimized.ktx2",
+     "textures/Operations_desktop.ktx2"
+    ]
+   }
+  },
+  "shipping": {
+   "label": "Shipping",
+   "kind": "3d-scene",
+   "count": 7,
+   "bytes": 2369286,
+   "files": {
+    "data": [
+     "data/ShippingScene.theatre-project-state_12.json"
+    ],
+    "images": [
+     "images/shipping.jpg"
+    ],
+    "models": [
+     "models/EW26_Shipping_251204_compressed-optimized.glb",
+     "models/Shipping_bg_diffuse-optimized.glb",
+     "models/Shipping_fg_smaller_251127_compressed-optimized.glb"
+    ],
+    "textures": [
+     "textures/Shipping_bg_diffuse-optimized.ktx2",
+     "textures/Shipping_desktop.ktx2"
+    ]
+   }
+  },
+  "shopapp": {
+   "label": "Shop App",
+   "kind": "3d-scene",
+   "count": 7,
+   "bytes": 1855699,
+   "files": {
+    "data": [
+     "data/ShopAppScene.theatre-project-state_8.json"
+    ],
+    "images": [
+     "images/shop-app.jpg"
+    ],
+    "models": [
+     "models/EW26_ShopApp_251128v2_compressed-optimized.glb",
+     "models/EW26_ShopApp_251208v3_compressed-optimized.glb",
+     "models/ShopApp_bg_diffuse-optimized.glb"
+    ],
+    "textures": [
+     "textures/ShopApp_bg_diffuse-optimized.ktx2",
+     "textures/ShopApp_desktop.ktx2"
+    ]
+   }
+  },
+  "online": {
+   "label": "Online",
+   "kind": "3d-scene",
+   "count": 7,
+   "bytes": 2399223,
+   "files": {
+    "data": [
+     "data/online_db748f47-57c8-459c-92a5-266918bb9a26.json"
+    ],
+    "images": [
+     "images/online.jpg"
+    ],
+    "models": [
+     "models/EW26_Online_251209v3_compressed-optimized.glb",
+     "models/Online_fg_smaller_251127_compressed-optimized.glb"
+    ],
+    "textures": [
+     "textures/Online_bg-brighter_251201v2-optimized.ktx2",
+     "textures/Online_bg-brighter_251201v2-optimized_5cdbdf82-dff0-40c9-8c76-111f92afc5ee.ktx2",
+     "textures/Online_desktop.ktx2"
+    ]
+   }
+  },
+  "hero": {
+   "label": "Hero —— 首屏（暖色油画感）",
+   "kind": "3d-scene",
+   "count": 7,
+   "bytes": 3191098,
+   "files": {
+    "images": [
+     "images/EW26_Hero_251205_compressed-optimized.jpg",
+     "images/hero-desktop.jpg",
+     "images/hero-mobile.jpg"
+    ],
+    "models": [
+     "models/EW26_Hero_251205_compressed-optimized.glb",
+     "models/EW26_Hero_251207v3_compressed-optimized.glb"
+    ],
+    "textures": [
+     "textures/Hero-bg-hires-optimized.ktx2",
+     "textures/Hero_desktop.ktx2"
+    ]
+   }
+  },
+  "b2b": {
+   "label": "B2B",
+   "kind": "3d-scene",
+   "count": 7,
+   "bytes": 3825433,
+   "files": {
+    "images": [
+     "images/U75_b2b_ACH_payments.png",
+     "images/b2b.jpg",
+     "images/newProperty_1_B2B.jpg"
+    ],
+    "models": [
+     "models/B2B_fg_smaller_251127_compressed-optimizedv2.glb",
+     "models/EW26_B2B_251205v2_compressed-optimized.glb"
+    ],
+    "textures": [
+     "textures/B2B_Bg_Dark_251202-optimized.ktx2",
+     "textures/B2B_desktop.ktx2"
+    ]
+   }
+  },
+  "finance": {
+   "label": "Finance",
+   "kind": "3d-scene",
+   "count": 6,
+   "bytes": 2456826,
+   "files": {
+    "data": [
+     "data/FinanceScene.theatre-project-state_7.json"
+    ],
+    "models": [
+     "models/EW26_Finance_251208v2_compressed-optimized.glb",
+     "models/Finance_bg_diffuse-optimized.glb",
+     "models/finance_fg_smaller_251127_compressed-optimized.glb"
+    ],
+    "textures": [
+     "textures/Finance_bg-optimized.ktx2",
+     "textures/Finance_desktop.ktx2"
+    ]
+   }
+  },
+  "retail": {
+   "label": "Retail",
+   "kind": "3d-scene",
+   "count": 6,
+   "bytes": 3369595,
+   "files": {
+    "data": [
+     "data/RetailScene.theatre-project-state-cs-251209v2_b28f3c6c-7ab6-4036-9ac4-9f48df3024f0.json",
+     "data/retail_a6fc6047-2df6-4784-9112-b75c8a92ac02.json"
+    ],
+    "images": [
+     "images/U82_Collective_Retailer_directory..png",
+     "images/retail.jpg"
+    ],
+    "models": [
+     "models/Retail_mg_251205v2_compressed-optimized.glb"
+    ],
+    "textures": [
+     "textures/Retail_desktop.ktx2"
+    ]
+   }
+  },
+  "ui-chrome": {
+   "label": "站点 chrome（favicon / logo / og 图）",
+   "kind": "layer",
+   "count": 4,
+   "bytes": 1314513,
+   "files": {
+    "images": [
+     "images/favicon_16.png",
+     "images/favicon_256.png",
+     "images/favicon_32.png",
+     "images/share.png"
+    ]
+   }
+  },
+  "shared": {
+   "label": "通用素材（噪声 / 法线 / 道具）",
+   "kind": "layer",
+   "count": 4,
+   "bytes": 648649,
+   "files": {
+    "images": [
+     "images/mud_normal.webp"
+    ],
+    "models": [
+     "models/Renaissance_Globe_251209v2-optimized.glb",
+     "models/Rigged_Book_CS_Animated_V5_compressed-optimized.glb",
+     "models/key.glb"
+    ]
+   }
+  }
+ }
+}

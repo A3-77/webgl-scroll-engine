@@ -1,0 +1,555 @@
+/* ===========================================================================
+   Winter 2026 复刻 Demo —— 样式
+   ---------------------------------------------------------------------------
+   关键点只有一个：`.canvas-host` 的「sticky + 负 margin」。
+   这一对组合替代了 GSAP ScrollTrigger 的 pin，全程零 JS 参与定位。
+
+   字体说明：真实站点用的是 NeueMontreal / HWCigars / ImperialScript 三套商业字体，
+   Demo 里用系统字体栈近似（见 --font-*）。换成你自己的字体只需要改这三个变量，
+   或者把 woff2 放进 public/assets/ 然后加 @font-face。
+   =========================================================================== */
+
+:root {
+  /*
+   * ★ 字体与字号阶梯来自内容包，由 config/content.config.ts 的 applySiteToCss()
+   *   在运行时写成 CSS 自定义属性。这里的值只是**内容包加载完成前的兜底** ——
+   *   如果看到这里的中性字体栈，说明内容包还没加载好（或加载失败了）。
+   *
+   *   为什么字体走 CSS 变量而不是给每个元素写 inline style：
+   *   章节标题 / 眉题 / 正文多处需要同一套字号，逐个写 style 会重复且难改。
+   */
+  --site-font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --site-font-display: Georgia, 'Songti SC', 'Times New Roman', serif;
+
+  --font-sans: var(--site-font-sans);
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* 兜底排版 token —— 同样会被内容包覆写 */
+  --site-h2-size: clamp(40px, 9.3vw, 132px);
+  --site-h2-weight: 700;
+  --site-h2-tracking: -0.03em;
+  --site-h2-leading: 0.9;
+  --site-h3-size: clamp(24px, 3.2vw, 52px);
+  --site-h3-weight: 700;
+  --site-h3-tracking: -0.02em;
+  --site-h3-leading: 0.95;
+  --site-eyebrow-size: clamp(11px, 0.85vw, 13px);
+  --site-eyebrow-weight: 500;
+  --site-eyebrow-tracking: 0.18em;
+  --site-body-size: clamp(14px, 1.05vw, 17px);
+  --site-body-weight: 400;
+  --site-body-leading: 1.55;
+  --site-body-tracking: -0.01em;
+
+  --bg: #0b0a09;
+  --ink: #f4efe8;
+  --ink-dim: rgba(244, 239, 232, 0.62);
+  --ink-faint: rgba(244, 239, 232, 0.3);
+  --line: rgba(244, 239, 232, 0.14);
+
+  --pad-x: clamp(20px, 6.5vw, 128px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior-y: none;
+}
+
+body {
+  /* 原生滚动条交给 Lenis 接管，但保留浏览器默认滚动条宽度以免布局跳动 */
+  overflow-x: hidden;
+}
+
+.app {
+  position: relative;
+}
+
+/* --------------------------------------------------------------------------
+   Lenis 需要的几个覆盖（Lenis 1.1+ 不再自动注入这些样式）
+   -------------------------------------------------------------------------- */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   ★ 画布钉住
+   sticky 让它停在视口，-100vh 的 margin-bottom 让它不占文档流空间，
+   于是后面的章节从文档顶部开始、直接叠在画布上。
+   完全对齐真实站点实测的 class：sticky top-0 left-0 w-full h-[100vh] -mb-[100vh]
+   -------------------------------------------------------------------------- */
+.canvas-host {
+  position: sticky;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  margin-bottom: -100vh;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--bg);
+}
+
+.canvas-host canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* --------------------------------------------------------------------------
+   章节
+   -------------------------------------------------------------------------- */
+.sections {
+  position: relative;
+  z-index: 1;
+}
+
+.section {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.section__inner {
+  /* 文字在章节内也钉住，这样它在画布过渡期间保持稳定，不会被卷走 */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  width: 100%;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(12px, 1.6vw, 22px);
+  padding: 0 var(--pad-x);
+
+  /* 未激活时隐藏 —— 避免多个章节的文案在 sticky 期间互相叠加 */
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 0.9s cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+  pointer-events: none;
+}
+
+.section.is-active .section__inner {
+  opacity: 1;
+  transform: none;
+}
+
+.section__eyebrow {
+  margin: 0;
+  /* ★ 排版 token 由内容包提供（applySiteToCss 写成 CSS 变量），兜底值在 :root */
+  font-size: var(--site-eyebrow-size);
+  font-weight: var(--site-eyebrow-weight);
+  letter-spacing: var(--site-eyebrow-tracking);
+  text-transform: uppercase;
+  color: var(--accent, var(--ink-dim));
+}
+
+.section__title {
+  margin: 0;
+  /* 兜底来自引擎默认 token；Shopify 内容包会覆写成实测的 149.386px */
+  font-size: var(--site-h2-size);
+  font-weight: var(--site-h2-weight);
+  letter-spacing: var(--site-h2-tracking);
+  line-height: var(--site-h2-leading);
+  text-wrap: balance;
+}
+
+.section__body {
+  margin: 0;
+  max-width: 46ch;
+  font-size: var(--site-body-size);
+  font-weight: var(--site-body-weight);
+  line-height: var(--site-body-leading);
+  letter-spacing: var(--site-body-tracking);
+  color: var(--ink-dim);
+}
+
+.section__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(14px, 2vw, 34px);
+  margin: clamp(8px, 1.4vw, 18px) 0 0;
+  padding-top: clamp(12px, 1.6vw, 20px);
+  border-top: 1px solid var(--line);
+}
+
+.section__meta div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.section__meta dt {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.section__meta dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent, var(--ink));
+}
+
+/* --------------------------------------------------------------------------
+   章节导航
+   -------------------------------------------------------------------------- */
+.nav {
+  position: fixed;
+  right: clamp(14px, 2.4vw, 40px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav__dot {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: rgba(11, 10, 9, 0.4);
+  backdrop-filter: blur(6px);
+  color: var(--ink-faint);
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  transition:
+    color 0.35s ease,
+    border-color 0.35s ease,
+    background 0.35s ease,
+    transform 0.35s ease;
+}
+
+.nav__dot:hover {
+  color: var(--ink);
+  border-color: var(--ink-faint);
+  transform: scale(1.06);
+}
+
+.nav__dot.is-active {
+  color: #0b0a09;
+  background: var(--accent, var(--ink));
+  border-color: var(--accent, var(--ink));
+}
+
+.nav__rule {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   调试面板
+   -------------------------------------------------------------------------- */
+.hud {
+  position: fixed;
+  /* 放右下角：左侧是标题文案区，面板放左边会挡住标题 */
+  right: clamp(12px, 1.6vw, 24px);
+  bottom: clamp(12px, 1.6vw, 24px);
+  z-index: 20;
+  width: min(320px, calc(100vw - 32px));
+  padding: 12px 14px 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(10, 9, 8, 0.78);
+  backdrop-filter: blur(14px) saturate(1.2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-dim);
+  user-select: none;
+}
+
+.hud__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 9px;
+}
+
+.hud__title {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.hud__close {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.hud__close:hover {
+  color: var(--ink);
+}
+
+.hud__error {
+  margin: 0 0 8px;
+  color: #ff9c8a;
+  line-height: 1.5;
+}
+
+.hud__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px 12px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line);
+}
+
+.hud__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hud__label {
+  color: var(--ink-faint);
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hud__value {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud__bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.hud__bar.is-dim {
+  opacity: 0.42;
+}
+
+.hud__bar-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.hud__bar-track {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(244, 239, 232, 0.1);
+  overflow: hidden;
+}
+
+.hud__bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.1s linear;
+}
+
+.hud__heights {
+  padding: 9px 0 0;
+}
+
+.hud__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.hud__chip {
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 10px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud__chip.is-active {
+  color: #0b0a09;
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.hud__hint {
+  margin: 10px 0 0;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+}
+
+.hud__hint code {
+  color: var(--ink-dim);
+}
+
+.hud__toggle {
+  position: fixed;
+  right: clamp(12px, 1.6vw, 24px);
+  bottom: clamp(12px, 1.6vw, 24px);
+  z-index: 20;
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(10, 9, 8, 0.78);
+  backdrop-filter: blur(10px);
+  color: var(--ink-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
+.hud__toggle:hover {
+  color: var(--ink);
+}
+
+/* --------------------------------------------------------------------------
+   响应式：窄屏收掉调试面板和导航（真实站点在窄屏也是大幅简化 WebGL 表现）
+   -------------------------------------------------------------------------- */
+@media (max-width: 860px) {
+  .hud {
+    width: min(280px, calc(100vw - 24px));
+  }
+
+  .section__inner {
+    max-width: none;
+  }
+
+  .section__meta {
+    display: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .nav {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section__inner {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   启动态（内容包加载中 / 加载失败）
+   --------------------------------------------------------------------------
+   内容包是**异步加载**的（import.meta.glob + 动态 import），所以 App 在
+   首帧会短暂处于 boot 状态。这段样式保证它不是一个裸的空白页。
+   ========================================================================== */
+
+.boot {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--pad-x);
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.boot__title {
+  margin: 0;
+  font-size: clamp(18px, 2.2vw, 28px);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.boot__detail {
+  margin: 0;
+  max-width: 78ch;
+  padding: 14px 16px;
+  overflow-x: auto;
+  border: 1px solid rgba(240, 149, 149, 0.35);
+  border-radius: 8px;
+  background: rgba(240, 149, 149, 0.08);
+  color: #f0c0c0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+/* 内容包回落提示（请求的包不存在）—— 用警告色而不是错误色，因为引擎仍在正常工作 */
+.hud__warn {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(239, 159, 39, 0.35);
+  border-radius: 6px;
+  background: rgba(239, 159, 39, 0.1);
+  color: #ef9f27;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/*
+ * 内容包给出的非致命提醒（例：某张图分割置信度偏低）。
+ * 刻意用比 hud__warn 更弱的视觉权重 —— 它是"值得知道"，不是"出问题了"，
+ * 和真正的错误抢注意力会让人分不清轻重。
+ */
+.hud__notes {
+  margin: 0 0 10px;
+  padding: 7px 10px 7px 24px;
+  border-left: 2px solid rgba(120, 160, 220, 0.5);
+  border-radius: 0 4px 4px 0;
+  background: rgba(120, 160, 220, 0.08);
+  color: #b8cbe4;
+  font-size: 11px;
+  line-height: 1.55;
+  list-style: disc;
+}
+
+.hud__notes li + li {
+  margin-top: 5px;
+}
