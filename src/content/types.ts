@@ -17,7 +17,7 @@
  *   因为 engine/ 里没有一行 import 指向它。
  */
 
-import type { AssetRegistry, PostConfig, SceneConfig } from '../schema';
+import type { AssetRegistry, AudioConfig, PostConfig, SceneConfig } from '../schema';
 
 /* ------------------------------------------------------------ 站点配置 */
 
@@ -77,6 +77,24 @@ export interface SiteConfig {
    *               { kind:'bloom', intensity:0.7 }] }
    */
   post?: PostConfig;
+
+  /**
+   * ★ 声音 —— 同样属于内容包的审美决策。
+   *
+   * 【默认静音，不是"默认播放"】
+   *   浏览器的自动播放策略要求 AudioContext 必须在用户手势里启动，
+   *   所以引擎**物理上做不到**"进页面就响"。UI 上放一个开关，
+   *   用户点了才 `AudioSystem.start()`。
+   *
+   *   这条约束反而是好事：突然出声的网页是最招人烦的东西之一。
+   *   让它变成"用户主动邀请"，既合规又礼貌。
+   *
+   * 【为什么音量/音色归内容包】
+   *   一个摄影集要的是安静的低频垫底，一个赛博朋克 demo 要的是
+   *   高频噪声 —— 引擎默认值不可能同时讨好两者。
+   *   和 post 一样：不声明 = 用引擎默认值，声明 = 整体替换。
+   */
+  audio?: AudioConfig;
 }
 
 /* ------------------------------------------------------------ 内容包 */

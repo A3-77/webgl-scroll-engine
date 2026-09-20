@@ -553,3 +553,94 @@ html.lenis body {
 .hud__notes li + li {
   margin-top: 5px;
 }
+
+/* ------------------------------------------------------------------ 声音开关 */
+
+/*
+ * 放左下角：右下角是调试面板（.hud），右侧中部是章节导航（.nav）。
+ * 左下是唯一一块完全空着的角落。
+ */
+.audio-toggle {
+  position: fixed;
+  left: clamp(12px, 1.6vw, 24px);
+  bottom: clamp(12px, 1.6vw, 24px);
+  z-index: 20;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+
+  padding: 7px 12px 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(10, 9, 8, 0.78);
+  backdrop-filter: blur(14px) saturate(1.2);
+
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  cursor: pointer;
+  user-select: none;
+
+  transition:
+    color 0.25s ease,
+    border-color 0.25s ease,
+    background 0.25s ease;
+}
+
+.audio-toggle:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--ink-faint);
+}
+
+.audio-toggle:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.audio-toggle.is-on {
+  color: var(--ink);
+  border-color: var(--accent, var(--ink-faint));
+}
+
+/* 状态灯：关 = 暗点，开 = 主色 + 呼吸 */
+.audio-toggle__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  opacity: 0.5;
+  transition:
+    background 0.25s ease,
+    opacity 0.25s ease;
+}
+
+.audio-toggle.is-on .audio-toggle__dot {
+  background: var(--accent, #e8e2d6);
+  opacity: 1;
+  animation: audio-pulse 2.4s ease-in-out infinite;
+}
+
+/*
+ * 呼吸而不是常亮：常亮的圆点会让人以为"卡住了"。
+ * 缓慢的呼吸暗示"这个东西是活的，正在跟着滚动变化"。
+ */
+@keyframes audio-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .audio-toggle.is-on .audio-toggle__dot {
+    animation: none;
+  }
+}

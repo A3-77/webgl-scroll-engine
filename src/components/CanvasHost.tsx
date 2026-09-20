@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Composer } from '../engine/Composer';
 import { disposeAssets, loadAssets, type LoadedAssets } from '../engine/loaders';
 import { createScrollEngine, type ScrollEngine } from '../animation/smoothScroll';
+import type { AudioSystem } from '../engine/systems/AudioSystem';
 import { sectionStore, getScrollState } from '../store/sectionStore';
 import { ENGINE_ASSETS } from '../content/engine-assets';
 import { createAssetSource, type ContentPack, type ResolvedContent } from '../content/types';
@@ -42,10 +43,35 @@ interface CanvasHostProps {
    *   由装配层（App）先解析好再传进来，这里就永远只有一个确定的输入。
    */
   content: ResolvedContent;
+  /**
+   * ★ 音频系统 —— 由 App 创建、这里驱动。
+   *
+   * 为什么实例不在本组件里 new：
+   *   开关按钮（AudioToggle）和渲染循环都要拿到同一个实例，
+   *   而按钮在 App 的 DOM 层。让**装配层**持有实例、两边各拿引用，
+   *   比"这里 new 完再想办法传出去"干净得多。
+   *
+   * 为什么放在 rAF 循环里 update 而不是给它自己的 setInterval：
+   *   音频的滤波器/颤音要跟着**滚动速度**走，而速度每帧都在变。
+   *   和渲染共用同一个 dt 与同一个 rAF，能保证声音和画面完全同步 ——
+   *   两套时钟跑出来的东西一定会漂移。
+   */
+  audio?: AudioSystem | null;
 }
 
-export function CanvasHost({ pack, content }: CanvasHostProps) {
+export function CanvasHost({ pack, content, audio }: CanvasHostProps) {
   const hostRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * ★ audio 为什么要过一道 ref：主 useEffect 的依赖是 [pack, content]，
+   *   它**不会**在 audio 变化时重跑。而 audio 是 App 在内容包解析完成后
+   *   才创建的（首帧必然是 null）。
+   *   如果循环里直接读 props 里的 audio，闭包捕获的就是那个 null，
+   *   声音永远不响 —— 而且没有任何报错，极难排查。
+   *   过一道 ref，循环每帧读 ref.current，拿到的一定是最新实例。
+   */
+  const audioRef = useRef<AudioSystem | null>(audio ?? null);
+  audioRef.current = audio ?? null;
 
   useEffect(() => {
     const host = hostRef.current;
@@ -197,6 +223,9 @@ export function CanvasHost({ pack, content }: CanvasHostProps) {
           sectionStore,
           pack,
           content,
+          // 取 ref 而不是 props：这个对象在 effect 里只建一次，
+          // 而 audio 实例是稍后才由 App 创建的。
+          audio: audioRef.current,
         };
 
         const start = performance.now();
@@ -216,6 +245,11 @@ export function CanvasHost({ pack, content }: CanvasHostProps) {
           // Lenis 必须在 rAF 里推进，它才会把滚动位置插值成逐帧连续值
           scrollEngine!.lenis.raf(now);
           composer!.render((now - start) / 1000, dt);
+
+          // ★ 声音与画面共用同一个 dt 与同一个 rAF —— 两套时钟一定会漂移。
+          //   stats.progress 就是这一帧的 uProgress（过渡进度），
+          //   和后处理吃的是同一个值，所以"画面炸开"和"声音响起"是同步的。
+          audioRef.current?.update(getScrollState(), composer!.stats.progress, dt);
 
           if (!readyFlagged) {
             readyFlagged = true;
@@ -334,7 +368,21 @@ export function CanvasHost({ pack, content }: CanvasHostProps) {
     // 与其写一套热切换逻辑，不如整体重建。所以 content 是依赖项。
     // 注意依赖的是 `content` 而不是 `pack`：pack 对象是稳定的（模块级常量），
     // 而 content 是每次解析的产物 —— 它变才真的意味着素材变了。
+    //
+    // audio 不进依赖项：它是 App 持有的一次性实例，本身是稳定的。
+    // 若它每次渲染都是新对象，这里会把整个 WebGL 栈拆了重建 —— 灾难。
   }, [pack, content]);
+
+  /**
+   * audio 实例是 App 在内容包解析完成后才建的，比本组件的 effect 晚。
+   * 这里把它补进调试入口，否则控制台里 `__ENGINE__.audio` 永远是 null。
+   */
+  useEffect(() => {
+    const eng = (window as unknown as Record<string, unknown>).__ENGINE__ as
+      | Record<string, unknown>
+      | undefined;
+    if (eng) eng.audio = audio;
+  }, [audio]);
 
   return <div ref={hostRef} className="canvas-host" aria-hidden="true" />;
 }

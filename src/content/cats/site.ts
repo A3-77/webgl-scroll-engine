@@ -11,7 +11,7 @@
 import { DESIGN } from '../../config/design';
 import { DEFAULT_TRANSITION_TEXTURES } from '../engine-assets';
 // 依赖方向：content/ → schema/ ✓（契约层是唯一被两边共享的东西）
-import type { PostConfig } from '../../schema';
+import type { AudioConfig, PostConfig } from '../../schema';
 import type { SiteConfig } from '../types';
 
 /**
@@ -91,10 +91,54 @@ const POST: PostConfig = {
   ],
 };
 
+/**
+ * ★ Cats 包的声音
+ * ---------------------------------------------------------------------------
+ * 油画素材配的是"偏暗、安静、有空间感"的底噪：
+ *   低频 drone（80Hz）+ 4 个去谐副本 + 一点混响 + 滚得快时滤波器打开。
+ *
+ * 【几个值的来历】
+ *   pitch 80 —— 再低就变成"轰隆"，再高就开始抢戏
+ *   voices 4 / detuneRange 14 —— 4 个副本 detune ±7 cents，
+ *     听感是"一个音"而不是"四个音"，但明显更厚
+ *   filterBase 320 → filterCeil 2600 —— 静止时闷、滚快时开，
+ *     这是"画面在动，声音也在动"的关键
+ *   tremolo 0.045 —— 只给一点点。0.1 以上就开始像"接触不良"
+ *   transition.type 'both' —— 噪声（撕纸感）+ 短 bell（翻页感）叠一起
+ *
+ * ★ 默认 OFF：UI 上的开关点了才会真的响（浏览器自动播放策略）。
+ */
+const AUDIO: AudioConfig = {
+  masterDb: -6,
+  ambient: {
+    enabled: true,
+    pitch: 80,
+    voices: 4,
+    detuneRange: 14,
+    filterBase: 320,
+    filterCeil: 2600,
+    reverb: 0.35,
+    gainDb: -22,
+  },
+  transition: {
+    enabled: true,
+    type: 'both',
+    duration: 0.18,
+    gainDb: -12,
+    filterFreq: 1800,
+  },
+  motion: {
+    filterOpen: 1,
+    tremolo: 0.045,
+    velocityRef: 55,
+  },
+};
+
 export const SITE: SiteConfig = {
   title: 'WebGL Scroll Engine — Cats',
   font: DESIGN.font,
   type: DESIGN.type,
   transitionTextures: { ...DEFAULT_TRANSITION_TEXTURES },
   post: POST,
+  audio: AUDIO,
 };

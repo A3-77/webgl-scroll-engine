@@ -18,3 +18,4 @@ export * from './scene';
 export * from './asset';
 export * from './scroll';
 export * from './post';
+export * from './audio';

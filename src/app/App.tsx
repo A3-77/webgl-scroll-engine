@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { CanvasHost } from '../components/CanvasHost';
 import { ScrollSections, SectionNav } from '../components/ScrollSections';
+import { AudioToggle } from '../components/AudioToggle';
 import { DebugHUD } from '../components/DebugHUD';
+import { AudioSystem } from '../engine/systems/AudioSystem';
 import { loadContentPack, applySiteToCss, type LoadedContent } from '../config/content.config';
 
 /**
@@ -30,6 +32,29 @@ export default function App() {
   const [loaded, setLoaded] = useState<LoadedContent | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [audio, setAudio] = useState<AudioSystem | null>(null);
+
+  /**
+   * ★ 音频系统由装配层持有。
+   *
+   * 为什么放在 App 而不是 CanvasHost 里 new：
+   *   开关按钮在 DOM 层、渲染循环在 CanvasHost，两边都要拿同一个实例。
+   *   装配层的职责本来就是"把各部分接起来"，让实例诞生在这里最自然。
+   *
+   * 为什么要等 loaded：
+   *   AudioSystem 的构造参数来自内容包的 `site.audio`。
+   *   早于内容包解析完成创建，就只能用引擎默认值 ——
+   *   那样内容包声明的音色就永远不生效了。
+   */
+  useEffect(() => {
+    if (!loaded) return;
+    const a = new AudioSystem(loaded.pack.site.audio);
+    setAudio(a);
+    return () => {
+      a.dispose();
+      setAudio(null);
+    };
+  }, [loaded]);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,9 +101,11 @@ export default function App() {
 
   return (
     <div className="app">
-      <CanvasHost pack={pack} content={content} />
+      <CanvasHost pack={pack} content={content} audio={audio} />
       <ScrollSections scenes={content.scenes} />
       <SectionNav scenes={content.scenes} />
+      {/* 声音开关：默认 OFF，用户点击才启动 AudioContext（浏览器自动播放策略） */}
+      <AudioToggle audio={audio} enabled />
       <DebugHUD
         scenes={content.scenes}
         packLabel={pack.label}
