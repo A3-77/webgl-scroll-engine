@@ -1,5 +1,7 @@
 # webgl-scroll-engine
 
+[![CI](https://github.com/A3-77/webgl-scroll-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/A3-77/webgl-scroll-engine/actions/workflows/ci.yml)
+
 **素材驱动的滚动叙事 WebGL 引擎。** 往 `input/` 丢几张图，跑两条命令，得到一个滚动驱动的 2.5D 叙事网站。
 
 不需要写 Three.js、Shader、Timeline 或 React 代码 —— 场景从素材里自动生成。
