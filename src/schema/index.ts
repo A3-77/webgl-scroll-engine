@@ -19,3 +19,4 @@ export * from './asset';
 export * from './scroll';
 export * from './post';
 export * from './audio';
+export * from './carrier';
