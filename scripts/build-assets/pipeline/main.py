@@ -122,7 +122,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--provider",
         default="colorkey",
-        help="分割算法（colorkey / manual / rembg）。用 --list-providers 查看详情",
+        help="分割算法（colorkey / manual / rembg / volcengine）。用 --list-providers 查看详情",
     )
     p.add_argument("--masks-dir", default=None, help="manual provider 的掩码目录")
     p.add_argument("--only", default=None, help="只处理指定场景，逗号分隔，如 scene01,scene02")
@@ -144,6 +144,24 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=None,
         help="colorkey 色度门阈值 sat×dist（0 = 关闭；默认 260，仅在背景非均匀时生效）",
+    )
+    # volcengine 专用（其余 provider 会忽略它们，见 SegmentProvider 的 **_ 约定）
+    p.add_argument(
+        "--max-entity",
+        type=int,
+        default=None,
+        help="volcengine 最多输出几个实体（1~100，默认 8）",
+    )
+    p.add_argument(
+        "--mask-threshold",
+        type=float,
+        default=None,
+        help="volcengine 置信度图二值化阈值（0..1，默认 0.5）",
+    )
+    p.add_argument(
+        "--no-refine",
+        action="store_true",
+        help="关闭 volcengine 的边缘增强（refine_mask=0）",
     )
     return p
 
@@ -296,6 +314,13 @@ def main(argv: list[str] | None = None) -> int:
         provider_kwargs["adaptive"] = False
     if args.chroma_gate is not None:
         provider_kwargs["chroma_gate"] = args.chroma_gate
+    if args.provider == "volcengine":
+        if args.max_entity is not None:
+            provider_kwargs["max_entity"] = args.max_entity
+        if args.mask_threshold is not None:
+            provider_kwargs["mask_threshold"] = args.mask_threshold
+        if args.no_refine:
+            provider_kwargs["refine"] = False
 
     provider = get_provider(args.provider, **provider_kwargs)
 

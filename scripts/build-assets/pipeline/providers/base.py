@@ -142,3 +142,7 @@ def load_builtin_providers() -> None:
         from . import rembg_provider  # noqa: F401
     except ImportError:
         pass
+
+    # volcengine 只依赖 stdlib + numpy + pillow，总是注册；
+    # 缺密钥时在构造期报错（此时错误信息最贴近用户的下一步动作）
+    from . import volcengine_provider  # noqa: F401
