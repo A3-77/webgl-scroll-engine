@@ -70,5 +70,5 @@ jobs:
       - name: Asset pipeline operator self-tests (17 assertions)
         run: npm run build-assets:selftest
 
-      - name: Asset pipeline dry-run on bundled input
-        run: npm run build-assets:check
+      - name: Asset pipeline end-to-end on bundled input (scene01/02)
+        run: npm run build-assets
