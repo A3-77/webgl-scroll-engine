@@ -17,3 +17,4 @@ export * from './object';
 export * from './scene';
 export * from './asset';
 export * from './scroll';
+export * from './post';

@@ -35,6 +35,7 @@ export const sectionStore = createStore<SectionState>({
   current: { index: 0, progress: 0 },
   next: null,
   mouse: [0.5, 0.5],
+  velocity: 0,
   ready: false,
   loaded: false,
   error: null,

@@ -22,7 +22,7 @@
  *
  *   ▸ 场景怎么求值        → SceneManager / CameraSystem / ObjectAnimationSystem
  *   ▸ 过渡进度怎么算      → animation/scrollProgress.transitionProgress
- *   ▸ 混合完之后的高光    → BloomSystem
+ *   ▸ 混合完之后的高光    → PostSystem（后处理链）
  *
  * ---------------------------------------------------------------------------
  * 【为什么要先各渲到纹理，而不是"直接渲两个场景到屏幕再混合"】

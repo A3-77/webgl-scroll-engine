@@ -4,7 +4,9 @@ import { transitionProgress } from '../animation/scrollProgress';
 import type { ModelAsset } from './loaders';
 import { SceneManager } from './systems/SceneManager';
 import { TransitionSystem, type TransitionTextures } from './systems/TransitionSystem';
-import { BloomSystem } from './systems/BloomSystem';
+import { PostSystem, type PostDrive } from './systems/PostSystem';
+import { DEFAULT_POST } from '../config/design';
+import type { PostConfig } from '../schema/post';
 
 /**
  * ★ 渲染编排器 —— 整站视觉的骨架
@@ -15,7 +17,7 @@ import { BloomSystem } from './systems/BloomSystem';
  *   ② 求值两个场景    current 按 currentT 求值，next 按 nextT 求值
  *                     （这是"两张图同时在动"的前提）
  *   ③ 过渡混合        TransitionSystem：各渲到离屏纹理 → 阈值场混合 → rtComposite
- *   ④ 高光溢出        BloomSystem：亮度阈值 → 半分辨率高斯（横竖各一次）→ 叠回
+ *   ④ 后处理链        PostSystem：bloom / 色差 / 颗粒 / 暗角 …（PHASE 18）
  *   ⑤ 输出屏幕
  *
  * ---------------------------------------------------------------------------
@@ -26,7 +28,7 @@ import { BloomSystem } from './systems/BloomSystem';
  *   ▸ 位移单位与视差倍率                  → ParallaxSystem      (PHASE 6)
  *   ▸ 每个图层怎么动                      → ObjectAnimationSystem(PHASE 7)
  *   ▸ 两张画面怎么混                      → TransitionSystem    (PHASE 8)
- *   ▸ 高光怎么溢出                        → BloomSystem         (PHASE 9)
+ *   ▸ 出厂前最后一道工序                  → PostSystem          (PHASE 18)
  *
  *   本类只剩两件事：**编排顺序** 和 **持有 rtComposite 这个交接点**。
  *
@@ -54,7 +56,12 @@ export interface ComposerStats {
   /** 上一帧的 draw call 数（renderer.info.render.calls） */
   drawCalls: number;
   triangles: number;
+  /** 后处理链是否启用（false = 过渡结果直接打屏） */
   bloom: boolean;
+  /** 后处理链里实际生效的效果数 */
+  postEffects: number;
+  /** 后处理活跃度 0..1 —— 看它就能判断 pulse 有没有在工作 */
+  postActivity: number;
   drawSize: string;
   /** 加载进显存的贴图数量（含过渡扰动图） */
   textureCount: number;
@@ -89,12 +96,26 @@ export interface ComposerOptions {
    * `site.transitionTextures` 解析好再传进来。
    */
   transitionTextures?: TransitionTextures;
-  /** 是否启用 bloom（默认 true）。关掉可以看清过渡 shader 的原始输出 */
+  /**
+   * ★ 后处理链配置。
+   *
+   * 【改造说明】这里原本是三个裸参数 `bloom` / `bloomThreshold` / `bloomStrength`
+   * —— 也就是"引擎在编译期就知道你只会要一个 bloom"。
+   * 现在整条链由 schema 声明，内容包想加颗粒、色差、暗角都在这一个对象里说。
+   * 不传就用 `config/design.ts` 的 DEFAULT_POST（保守四件套）。
+   *
+   * 不传和传 `{ enabled: false }` 的区别：
+   *   不传        → 走默认链
+   *   enabled:false → 一个后处理 pass 都不跑，过渡结果直接打屏
+   *                   （调阈值场时必须这样，否则分不清亮边是 shader 画的还是 bloom 加的）
+   */
+  post?: PostConfig;
+  /**
+   * @deprecated 后处理已经统一到 `post`。
+   * 保留这个开关只是为了让旧的调用点不炸 —— 它等价于 `post.enabled`。
+   * 显式传了 `post` 时本参数被忽略。
+   */
   bloom?: boolean;
-  /** 高光阈值 0..1 */
-  bloomThreshold?: number;
-  /** bloom 叠加强度 */
-  bloomStrength?: number;
 }
 
 export class Composer {
@@ -107,9 +128,9 @@ export class Composer {
   private sceneManager: SceneManager;
   /** 双场景交叉溶解 */
   private transition: TransitionSystem;
-  /** 高光溢出 */
-  private bloom: BloomSystem;
-  private enableBloom: boolean;
+  /** 出厂前最后一道工序：bloom / 色差 / 颗粒 / 暗角 … */
+  private post: PostSystem;
+  private enablePost: boolean;
 
   /**
    * 过渡 → bloom 的交接纹理。
@@ -125,6 +146,8 @@ export class Composer {
     drawCalls: 0,
     triangles: 0,
     bloom: true,
+    postEffects: 0,
+    postActivity: 0,
     drawSize: '0×0',
     textureCount: 0,
   };
@@ -133,18 +156,23 @@ export class Composer {
     const { gl, textures, models } = options;
     this.gl = gl;
     this.scrollState = options.scrollState;
-    this.enableBloom = options.bloom ?? true;
-    this.stats.bloom = this.enableBloom;
     this.stats.textureCount = textures.size;
 
     // 建场景。注意每个 section 一个独立 THREE.Scene + 独立 PerspectiveCamera
     // （真实站点也是这样：每个章节有自己的 camera 关键帧轨道，互不干扰）
     this.sceneManager = SceneManager.build(options.scenes, textures, models, 1);
     this.transition = new TransitionSystem(options.transitionTextures);
-    this.bloom = new BloomSystem({
-      threshold: options.bloomThreshold,
-      strength: options.bloomStrength,
-    });
+
+    // 后处理链。显式给了 post 就以它为准（此时忽略弃用的 bloom 开关），
+    // 否则沿用 DEFAULT_POST，但允许用 bloom:false 把它整体关掉。
+    const postConfig: PostConfig =
+      options.post ??
+      (options.bloom === false ? { ...DEFAULT_POST, enabled: false } : DEFAULT_POST);
+
+    this.enablePost = postConfig.enabled ?? true;
+    this.stats.bloom = this.enablePost;
+    this.post = new PostSystem(gl, postConfig);
+    this.stats.postEffects = this.post.stats.effectCount;
 
     // 关掉 three 的自动重置：默认每次 gl.render() 都会清空 info，
     // 那样 stats 只能读到最后一个 pass（也就是 1 个 draw call）。
@@ -174,7 +202,8 @@ export class Composer {
     });
 
     this.transition.setSize(this.width, this.height, pixelRatio);
-    this.bloom.setSize(this.width, this.height, pixelRatio);
+    // ★ 传 CSS 尺寸，不是 drawing buffer 尺寸 —— 理由见 PostSystem.setSize
+    this.post.setSize(this.width, this.height);
     this.sceneManager.setAspect(aspect);
 
     this.stats.drawSize = `${w}×${h}`;
@@ -210,7 +239,26 @@ export class Composer {
       state.viewportH,
     );
 
-    if (this.enableBloom) {
+    /**
+     * ★ 后处理活跃度 —— 让效果"跟着滚动呼吸"的驱动量。
+     *
+     * 【为什么用 sin(π × uProgress) 而不是直接用 uProgress】
+     *   uProgress 在章节切换的瞬间从 1 跳回 0。直接拿它当驱动量的话，
+     *   每换一章效果强度都会"啪"地掉一次，非常明显。
+     *   sin(π·u) 在 u=0 和 u=1 两端都是 0，左右连续 ——
+     *   切换瞬间两边都是 0，画面完全无缝；过渡进行到一半时最强。
+     *
+     * 【速度项为什么单独给】
+     *   只在切章时才有反应，大部分滚动时间里画面是"死的"。
+     *   加上速度项之后，快速滑动也会让色差/颗粒涌上来 ——
+     *   这才接近参考站点那种"手一直在操控画面"的感觉。
+     */
+    const drive: PostDrive = {
+      transition: Math.sin(Math.PI * uProgress),
+      velocity: state.velocity,
+    };
+
+    if (this.enablePost) {
       this.transition.render(
         gl,
         {
@@ -222,10 +270,11 @@ export class Composer {
         },
         this.rtComposite,
       );
-      // ④ 高光溢出 → ⑤ 屏幕
-      this.bloom.render(gl, this.rtComposite.texture, null);
+      // ④ 后处理链 → ⑤ 屏幕
+      this.post.render(gl, this.rtComposite.texture, drive, dt);
     } else {
-      // 省掉两次全屏 blit，直接把过渡结果打到屏幕
+      // 一个后处理 pass 都不跑，直接把过渡结果打到屏幕。
+      // 调阈值场时必须走这条 —— 否则分不清边界亮边是 shader 画的还是 bloom 加的。
       this.transition.render(
         gl,
         {
@@ -246,6 +295,7 @@ export class Composer {
     this.stats.nextProgress = frame.nextT;
     this.stats.drawCalls = gl.info.render.calls;
     this.stats.triangles = gl.info.render.triangles;
+    this.stats.postActivity = this.post.stats.activity;
   }
 
   /* ------------------------------------------------------------ 清理 */
@@ -253,7 +303,7 @@ export class Composer {
   dispose(): void {
     this.rtComposite?.dispose();
     this.transition.dispose();
-    this.bloom.dispose();
+    this.post.dispose();
     this.sceneManager.dispose();
   }
 }

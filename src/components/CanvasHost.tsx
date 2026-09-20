@@ -173,6 +173,9 @@ export function CanvasHost({ pack, content }: CanvasHostProps) {
           },
           // ★ 引擎不认 store —— 只给一个取值函数
           scrollState: getScrollState,
+          // ★ 内容包声明的胶片风格。不传就用 config/design.ts 的 DEFAULT_POST。
+          //   这里只是把"内容包的审美"翻译成"引擎能吃的配置"，引擎依然不认内容包。
+          post: pack.site.post,
         });
         composer.setSize(w, h, dpr);
 

@@ -65,6 +65,10 @@ export function createScrollEngine(options: ScrollEngineOptions): ScrollEngine {
       current: result.current,
       next: result.next,
       activeSection: computeActiveSection(y, heights, viewportH),
+      // ★ Lenis 自己算的平滑速度，直接透传给后处理做「滚动脉冲」。
+      //   Lenis 的 velocity 在实例上恒存在（构造时初始化为 0），但类型定义里
+      //   标成了可选，所以用 ?? 兜底，避免静止时为 undefined 污染下游算术。
+      velocity: lenis.velocity ?? 0,
     });
   };
 

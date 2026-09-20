@@ -12,6 +12,8 @@
  *   ▸ content/shopify/site.ts —— 保留那批实测值，作为 Shopify 内容包自己的配置
  */
 
+import type { PostConfig } from '../schema/post';
+
 export const DESIGN = {
   /**
    * 默认字体族。
@@ -98,3 +100,60 @@ export const DESIGN = {
     mouseInfluence: 0.1,
   },
 } as const;
+
+/**
+ * ★ 引擎级后处理默认值
+ * ---------------------------------------------------------------------------
+ * 与 `DESIGN` 分开导出的原因：DESIGN 是 `as const` 的**排版/滚动** token，
+ * 而后处理配置要能被内容包整体替换（一个包可能一个效果都不要），
+ * 混进 as const 的 DESIGN 里会让"整体替换"这件事变得别扭。
+ *
+ * 【为什么这套默认值偏保守】
+ *   引擎默认值必须**中立** —— 它不能带着某个内容的审美。
+ *   所以这里只保留"几乎任何素材都适用"的四件套：
+ *     bloom（沿用自制版实测的 0.85 强度）+ 极轻的色差 + 极轻的颗粒 + 暗角。
+ *   想要更强烈的风格（比如印刷感：重颗粒 + 扫描线 + 强色差），
+ *   由内容包在自己的 `site.post` 里声明 —— 那是内容的审美决策。
+ *
+ * 【pulse 的取值理由】
+ *   色差给 1.6、颗粒给 1.2 —— 这两个是"过渡瞬间最抓眼球"的，
+ *   给大了才能在切换的 0.3 秒里被看见。
+ *   bloom / vignette 只给 0.35 —— 它们是"底子"，剧烈变化会显得画面在喘。
+ */
+export const DEFAULT_POST: PostConfig = {
+  enabled: true,
+  frameBufferType: 'halfFloat',
+  multisampling: 0,
+  effects: [
+    {
+      kind: 'bloom',
+      // 强度/阈值/软膝沿用自制 BloomSystem 的实测值，保证观感不突变
+      intensity: 0.85,
+      luminanceThreshold: 0.62,
+      luminanceSmoothing: 0.55,
+      mipmapBlur: true,
+      radius: 0.72,
+      pulse: 0.35,
+    },
+    {
+      kind: 'chromaticAberration',
+      offset: [0.0009, 0.0007],
+      radialModulation: true,
+      modulationOffset: 0.35,
+      // 切章瞬间色差炸开 —— 这是"镜头感"最便宜的来源
+      pulse: 1.6,
+    },
+    {
+      kind: 'noise',
+      blend: 'overlay',
+      opacity: 0.05,
+      pulse: 1.2,
+    },
+    {
+      kind: 'vignette',
+      offset: 0.32,
+      darkness: 0.4,
+      pulse: 0.35,
+    },
+  ],
+};

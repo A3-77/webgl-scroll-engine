@@ -64,4 +64,17 @@ export interface ScrollState {
   next: SectionProgress | null;
   /** 归一化鼠标位置，0..1，供过渡 shader 的 uMouse 使用 */
   mouse: [number, number];
+  /**
+   * Lenis 的滚动速度（px/帧，带符号）。静止时为 0。
+   *
+   * 为什么引擎需要它：
+   *   后处理的「滚动脉冲」要靠速度驱动 —— 参考站点的画面之所以有生命感，
+   *   是因为滚快的时候色差/颗粒会跟着变重，而不是一个恒定滤镜。
+   *   没有这个量，后处理就只能是静态的。
+   *
+   * 为什么不是引擎自己算 (scrollY - lastScrollY) / dt：
+   *   Lenis 内部已经对速度做过平滑，直接吃它的值比自己差分更稳，
+   *   而且引擎就不必持有上一帧的状态（保持 render() 的无状态性）。
+   */
+  velocity: number;
 }

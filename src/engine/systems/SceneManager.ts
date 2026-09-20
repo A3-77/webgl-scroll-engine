@@ -24,7 +24,7 @@
  *
  *   ▸ 场景内部怎么求值      → CameraSystem / ObjectAnimationSystem
  *   ▸ 渲染到哪张纹理        → TransitionSystem
- *   ▸ 混合完之后的高光      → BloomSystem
+ *   ▸ 混合完之后的高光      → PostSystem（后处理链）
  *
  * ---------------------------------------------------------------------------
  * 【★ 为什么每章要有独立的 Scene + 独立的 PerspectiveCamera】

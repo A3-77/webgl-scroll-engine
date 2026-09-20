@@ -17,7 +17,7 @@
  *   因为 engine/ 里没有一行 import 指向它。
  */
 
-import type { AssetRegistry, SceneConfig } from '../schema';
+import type { AssetRegistry, PostConfig, SceneConfig } from '../schema';
 
 /* ------------------------------------------------------------ 站点配置 */
 
@@ -57,6 +57,26 @@ export interface SiteConfig {
     /** 法线图，R 通道被用作位移偏移 */
     displacement: string;
   };
+
+  /**
+   * ★ 后处理链 —— 内容包自己的"胶片风格"。
+   *
+   * 为什么它属于内容而不是引擎：
+   *   "画面要不要颗粒、色差多重、暗角多深"是**审美决策**，
+   *   和"标题用什么字体"是同一类东西。引擎默认值（config/design.ts 的
+   *   DEFAULT_POST）必须保持中立，否则一个偏印刷风的引擎默认值
+   *   套到干净的商业摄影上就是灾难。
+   *
+   *   不声明 → 用引擎的保守四件套（bloom + 极轻色差 + 极轻颗粒 + 暗角）。
+   *   声明了   → 整体替换，引擎默认值一条都不生效。
+   *
+   * 例：想要 shader.se 那种印刷/胶片感，就声明
+   *   { effects: [{ kind:'noise', opacity:0.12, pulse:1.5 },
+   *               { kind:'chromaticAberration', offset:[0.0016,0.0012], pulse:2 },
+   *               { kind:'scanline', density:1.6, opacity:0.06 },
+   *               { kind:'bloom', intensity:0.7 }] }
+   */
+  post?: PostConfig;
 }
 
 /* ------------------------------------------------------------ 内容包 */

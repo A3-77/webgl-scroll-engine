@@ -15,6 +15,10 @@ interface Snapshot {
   triangles: number;
   drawSize: string;
   bloom: boolean;
+  /** 后处理链里生效的效果数（4 / 7 之类） */
+  postEffects: number;
+  /** 平滑后的活跃度 0..1 —— pulse 是否有在工作，看它一眼就知道 */
+  postActivity: number;
   fps: number;
   dpr: number;
   objectCount: number;
@@ -34,6 +38,8 @@ const EMPTY: Snapshot = {
   triangles: 0,
   drawSize: '—',
   bloom: true,
+  postEffects: 0,
+  postActivity: 0,
   fps: 0,
   dpr: 0,
   objectCount: 0,
@@ -104,6 +110,8 @@ export function DebugHUD({ scenes, packLabel, warning, notes }: DebugHUDProps) {
         triangles: stats?.triangles ?? 0,
         drawSize: stats?.drawSize ?? '—',
         bloom: stats?.bloom ?? true,
+        postEffects: stats?.postEffects ?? 0,
+        postActivity: stats?.postActivity ?? 0,
         fps,
         dpr: api?.renderer?.getPixelRatio?.() ?? 0,
         objectCount: api?.content?.scenes?.reduce(
@@ -161,6 +169,8 @@ export function DebugHUD({ scenes, packLabel, warning, notes }: DebugHUDProps) {
         <Row label="triangles" value={String(snap.triangles)} />
         <Row label="textures" value={String(snap.textureCount)} />
         <Row label="bloom" value={snap.bloom ? 'on' : 'off'} />
+        <Row label="post effects" value={String(snap.postEffects)} />
+        <Row label="post activity" value={snap.postActivity.toFixed(2)} />
         <Row label="objects" value={String(snap.objectCount)} />
 
         <Row label="scrollY" value={snap.scrollY.toFixed(1)} />
