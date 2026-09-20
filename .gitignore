@@ -43,4 +43,4 @@ yarn-error.log*
 # Env (no secrets in repo)
 .env
 .env.local
-.env.*.local
+.env.*.local.release-notes-v0.1.0.md
