@@ -85,6 +85,93 @@ const VELOCITY_REF = 55;
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
 
+/* ------------------------------------------------------------ 语义映射层 */
+
+/**
+ * ★ 为什么需要这一层（PHASE 18 遗留的真实缺陷，2026-09-20 实测发现并修复）
+ * ===========================================================================
+ * 本项目的 schema（src/schema/post.ts）用的是**人类直觉**的语义：
+ *   饱和度倍率 1 = 原样、0 = 灰度
+ *   对比度倍率 1 = 原样
+ *   亮度偏移   0 = 原样
+ *
+ * 但 pmndrs/postprocessing 的 uniform 用的是**偏移量**语义，两套对不上：
+ *
+ *   HueSaturationEffect       saturation = 0 才是原样，取值 -1..1
+ *                             （库 JSDoc 原话：
+ *                              "ranging from -1 to 1, where 0 means no change"）
+ *   BrightnessContrastEffect  contrast = 0 才是原样
+ *                             （库 JSDoc 原话同上）
+ *                             ★ 但它的 brightness **同样是 0 = 原样**，
+ *                               与 schema 的「偏移」语义恰好一致 ——
+ *                               这一项**不需要**映射，别好心加 0.5。
+ *
+ * 【不映射会怎样 —— 实测数据】
+ *   cats 包声明 saturation: 0.92（本意是"略降饱和"）直接透传，
+ *   shader 里走 `color += diff * (1 - 1/(1.001 - 0.92))` ≈ `diff * -998`，
+ *   于是**整屏炸成霓虹色**，再被 bloom 一糊就成了白屏上的彩色噪点。
+ *   contrast: 1.06 透传进 `color /= (1 - 1.06)` = `color / -0.06`，直接反相。
+ *   两个叠起来，画面全废。
+ *
+ * 【★ 反向踩坑记录：brightness 加 0.5 会过曝】
+ *   第一版修法"顺手"把 brightness 也平移了 0.5（以为 0.5 是中性），
+ *   结果整屏过曝成白。原因在 shader 的最后一行：
+ *       color = inputColor + (brightness - 0.5);
+ *       ... contrast 处理 ...
+ *       outputColor = color + 0.5;
+ *   首尾两个 0.5 互相抵消 —— brightness = 0 才是恒等。
+ *   教训：**要按 shader 的完整算式反解中性值，不能只看中间那行**。
+ *
+ * 【为什么不是"改内容包的值去迁就库"】
+ *   那样等于把库的怪语义泄漏进内容包的作者手里 ——
+ *   下一个包作者还得再踩一遍。映射必须在引擎这一层做完，
+ *   内容包只面对"倍率 1 = 原样、偏移 0 = 原样"这一套。
+ * ===========================================================================
+ */
+
+/**
+ * 饱和度倍率 → pmndrs 偏移。
+ * 倍率 1 恰好映射到 0（原样），倍率 0 映射到 -1（灰度）。
+ * 上限钳到 0.999：shader 里 `1.001 - s` 做分母，s 到 1 就是除零。
+ *
+ * 导出只为让单测能直接钉住这层映射 —— 它是 schema 与库语义的契约边界。
+ */
+export const saturationToOffset = (mult: number): number => Math.min(mult - 1, 0.999);
+
+/**
+ * 对比度倍率 → pmndrs 偏移。
+ * shader 分两段，实际增益分别是：
+ *   c > 0 → color /= (1 - c)   ⇒ 增益 1/(1-c)
+ *   c ≤ 0 → color *= (1 + c)   ⇒ 增益 1+c
+ * 反解出让增益恰好等于 schema 承诺的倍率 k：
+ *   k ≥ 1 → c = 1 - 1/k
+ *   k < 1 → c = k - 1
+ * 这样任何 k 都取不到 c = 1 的除零点（k→∞ 时 c→1⁻）。
+ */
+export const contrastToOffset = (mult: number): number => (mult >= 1 ? 1 - 1 / mult : mult - 1);
+
+/**
+ * 亮度偏移 → pmndrs 电平。**恒等**。
+ *
+ * 看起来该有个映射，其实没有：shader 的完整算式是
+ *     color      = inputColor + (brightness - 0.5)
+ *     color      = color / (1 - contrast)   （或 × (1 + contrast)）
+ *     outputColor = color + 0.5
+ * 首尾两个 0.5 互相抵消，所以 `brightness = 0` 就是恒等，
+ * 与 schema 承诺的「偏移 0 = 原样」完全一致。
+ *
+ * 这里保留这个函数只是为了让三处语义在代码里**并排出现**，
+ * 一眼能看出"哪几个要映射、哪个不要" —— 而不是让亮度静默地直传，
+ * 下一个读代码的人又去猜它是不是漏了。
+ */
+export const brightnessToLevel = (offset: number): number => offset;
+
+/**
+ * pmndrs 对比度偏移 → 实际增益。与库内 shader 的两段式公式逐字对应，
+ * 单测用它来验证「映射回来的增益 == schema 承诺的倍率」。
+ */
+export const contrastOffsetToGain = (c: number): number => (c > 0 ? 1 / (1 - c) : 1 + c);
+
 /* ------------------------------------------------------------ 每帧驱动量 */
 
 export interface PostDrive {
@@ -313,10 +400,13 @@ export class PostSystem {
       }
 
       case 'hueSaturation': {
+        // schema 语义：saturation 是**倍率**（1 = 原样，0 = 灰度）。
+        // ★ 必须过 saturationToOffset —— 直接透传会让 0.92 变成 `diff * -998`，
+        //   实测整屏炸成霓虹色。详见文件头「语义映射层」。
         const saturation = spec.saturation ?? 1.0;
         const e = new HueSaturationEffect({
           hue: spec.hue ?? 0,
-          saturation,
+          saturation: saturationToOffset(saturation),
         });
         return {
           kind: spec.kind,
@@ -324,24 +414,32 @@ export class PostSystem {
           base: [saturation],
           pulse,
           apply: (a) => {
-            e.saturation = saturation * (1 + pulse * a);
+            // 脉冲放大的是**schema 的倍率**，再重新映射 —— 不能放大 pmndrs 的偏移量，
+            // 那会把"中性"（偏移 0）也一起推走。
+            e.saturation = saturationToOffset(saturation * (1 + pulse * a));
           },
         };
       }
 
       case 'brightnessContrast': {
+        // schema 语义：brightness 是**偏移**（0 = 原样），contrast 是**倍率**（1 = 原样）。
+        // ★ 两者都要过映射 —— pmndrs 那边是「0.5 电平 / 0 偏移」。
+        //   直接透传实测：0.02 → 压黑 0.48，1.06 → `color / -0.06` 反相。
+        const brightness = spec.brightness ?? 0;
         const contrast = spec.contrast ?? 1.0;
         const e = new BrightnessContrastEffect({
-          brightness: spec.brightness ?? 0,
-          contrast,
+          brightness: brightnessToLevel(brightness),
+          contrast: contrastToOffset(contrast),
         });
         return {
           kind: spec.kind,
           effect: e,
-          base: [contrast],
+          base: [brightness, contrast],
           pulse,
           apply: (a) => {
-            e.contrast = contrast * (1 + pulse * a);
+            const k = 1 + pulse * a;
+            e.brightness = brightnessToLevel(brightness * k);
+            e.contrast = contrastToOffset(contrast * k);
           },
         };
       }
