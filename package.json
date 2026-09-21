@@ -1,7 +1,7 @@
 {
   "name": "webgl-scroll-engine",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.5.0",
   "type": "module",
   "description": "素材驱动的滚动叙事 WebGL 引擎 —— 放入两张图，得到一个滚动驱动的 3D 叙事网站",
   "homepage": "https://github.com/A3-77/webgl-scroll-engine",
