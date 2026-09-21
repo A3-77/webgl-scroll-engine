@@ -203,6 +203,10 @@ build: async ({ aspect }) => {
 ## 文档
 
 - [`docs/内容包契约.md`](docs/内容包契约.md) —— **怎么写自己的内容包**（两种形态、场景契约、容易踩的点）
+- [`docs/PHASE-24-火山引擎分割.md`](docs/PHASE-24-火山引擎分割.md) —— 用 EntitySegment 做实例分割（挨着的主体也能拆开），含鉴权排查全过程
+- [`docs/PHASE-23-3D过渡载体.md`](docs/PHASE-23-3D过渡载体.md) —— 载体飞过 + 溶解跟随 + 有机边缘；**以及顺带挖出的 PHASE 18 后处理语义缺陷**
+- [`docs/PHASE-22-音频.md`](docs/PHASE-22-音频.md) —— Tone.js 环境音与转场音效，与后处理共用活跃度
+- [`docs/PHASE-18-postprocessing.md`](docs/PHASE-18-postprocessing.md) —— pmndrs 后处理链、滚动脉冲；**尾部有语义缺陷的事后补记**
 - [`docs/PHASE-21-单元测试.md`](docs/PHASE-21-单元测试.md) —— 构图数学的单测，以及它抓到的一个真 bug
 - [`docs/PHASE-20-能力验收.md`](docs/PHASE-20-能力验收.md) —— 引擎声明的能力逐项验证（25 项里哪些真跑过）
 - [`docs/PHASE-19-模板化.md`](docs/PHASE-19-模板化.md) —— 通用性验证（换一套完全不同的素材真跑一遍）与脚手架

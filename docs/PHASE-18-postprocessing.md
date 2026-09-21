@@ -219,3 +219,44 @@ npm run dev                  # 开发服务器
   所以没踩反引号截断的坑。新加 shader 务必跑 typecheck（见 MEMORY.md）。
 - **pmndrs 输出色彩空间** —— 我们 renderer 是 `LinearSRGBColorSpace`，
   EffectPass 直接写屏与之前一致；切到 sRGB 输出色空间需要重新验证（没改）。
+---
+
+## ★ 事后补记（2026-09-20）：一个被默认配置掩盖的真实缺陷
+
+**这份文档当时写的"已实现能力"是准确的，但有一个语义缺陷没被发现 ——
+因为默认链恰好绕过了它。**
+
+### 缺陷
+
+`PostSystem` 把 schema 的值**原样透传**给 pmndrs 的 uniform，
+但两套语义对不上（详见 [`PHASE-23-3D过渡载体.md`](PHASE-23-3D过渡载体.md) 第 5 节）：
+
+| 字段 | schema 承诺 | pmndrs 实际要求 | 原实现 |
+|---|---|---|---|
+| `hueSaturation.saturation` | 倍率，**1 = 原样** | 偏移，**0 = 原样** | ✗ 直接透传 |
+| `brightnessContrast.contrast` | 倍率，**1 = 原样** | 偏移，**0 = 原样** | ✗ 直接透传 |
+| `brightnessContrast.brightness` | 偏移，**0 = 原样** | 偏移，**0 = 原样** | ✓ 恰好对 |
+
+后果：`saturation: 0.92` 走成 `diff * (1 - 1/(1.001-0.92))` ≈ `diff * -998`，
+**整屏霓虹色**；`contrast: 1.06` 走成 `color / (1 - 1.06)` = `color / -0.06`，
+**直接反相**。
+
+### 为什么没被发现
+
+`DEFAULT_POST`（`src/config/design.ts`）只用了
+`bloom` / `chromaticAberration` / `noise` / `vignette` ——
+**这四个的语义恰好都对得上**。所以：
+
+- shopify 包（走默认链）一直正常 ✓
+- cats 包（显式声明了 `hueSaturation` + `brightnessContrast`）全废 ✗
+- 而且炸得很像"素材/分割有问题"，掩盖了真正的原因
+
+### 修法
+
+在 `PostSystem` 里加一层语义映射（`saturationToOffset` / `contrastToOffset` /
+`brightnessToLevel`），并补 `PostSystem.test.ts` 13 项防回归测试。
+
+> **教训**：把第三方库的 uniform 语义当作"显然和我的 schema 一样"，
+> 是这次的根本错误。**声明式配置层必须有一层显式的语义映射，
+> 并且要有测试钉住它** —— 否则默认配置会把缺陷藏起来，
+> 直到某个内容包第一次用到那些"冷门"效果才炸，而且炸得莫名其妙。

@@ -197,6 +197,7 @@ class VolcengineSegmentProvider(SegmentProvider):
         refine: bool = True,
         max_side: int = 2048,
         min_area_ratio: float = 0.002,
+        bg_span: float = 0.9,
         timeout: float = 60.0,
         **_: Any,
     ) -> None:
@@ -223,6 +224,7 @@ class VolcengineSegmentProvider(SegmentProvider):
         self.refine = bool(refine)
         self.max_side = int(max_side)
         self.min_area_ratio = float(min_area_ratio)
+        self.bg_span = float(bg_span)
         self.timeout = float(timeout)
 
     def describe(self) -> str:
@@ -261,8 +263,20 @@ class VolcengineSegmentProvider(SegmentProvider):
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", errors="ignore")[:600]
+            # ★ 业务错误也走 HTTP 错误码（401/400）回来，但正文里有精确原因。
+            #   把它挑出来，否则用户只能看到一个干巴巴的 HTTP 状态码。
+            hint = ""
+            try:
+                parsed = json.loads(detail)
+                err = (parsed.get("ResponseMetadata") or {}).get("Error") or {}
+                result = parsed.get("Result") or {}
+                hint = err.get("Message") or result.get("message") or ""
+                if hint:
+                    hint = f"\n  {err.get('Code', '')} {hint}"
+            except Exception:
+                pass
             raise SystemExit(
-                f"[segment] 火山引擎 HTTP {e.code}\n  {detail}"
+                f"[segment] 火山引擎 HTTP {e.code}{hint}\n  {detail}"
             ) from e
         except urllib.error.URLError as e:
             raise SystemExit(f"[segment] 火山引擎请求失败（网络/代理？）: {e.reason}") from e
@@ -340,15 +354,31 @@ class VolcengineSegmentProvider(SegmentProvider):
         }
 
         resp = self._post(body)
-        code = resp.get("code")
+
+        # ★ 响应的两种壳（实测确认，文档只写了第一种）：
+        #   视觉智能的**文档**写的是  {"code":10000,"data":{...},"request_id":...}
+        #   实际网关返回的是      {"ResponseMetadata":{...},"Result":{同样那些字段}}
+        #   只按文档读顶层 code 会拿到 None，然后误报成"返回码错误"。
+        #   所以先剥壳再取值，两种形态都能吃下。
+        envelope = resp.get("Result") if isinstance(resp.get("Result"), dict) else resp
+
+        meta_err = (resp.get("ResponseMetadata") or {}).get("Error")
+        if isinstance(meta_err, dict) and meta_err.get("Code"):
+            raise SystemExit(
+                f"[segment] EntitySegment 被拒绝: {meta_err.get('Code')} "
+                f"{meta_err.get('Message')!r}\n"
+                f"  request_id={(resp.get('ResponseMetadata') or {}).get('RequestId')}"
+            )
+
+        code = envelope.get("code", envelope.get("status"))
         if code != 10000:
             raise SystemExit(
                 f"[segment] EntitySegment 返回 code={code} "
-                f"message={resp.get('message')!r}\n"
-                f"  request_id={resp.get('request_id')}"
+                f"message={envelope.get('message')!r}\n"
+                f"  request_id={envelope.get('request_id')}"
             )
 
-        data = resp.get("data") or {}
+        data = envelope.get("data") or {}
         algo = data.get("algorithm_base_resp") or {}
         if algo.get("status_code") not in (0, None):
             raise SystemExit(
@@ -372,10 +402,12 @@ class VolcengineSegmentProvider(SegmentProvider):
             )
 
         min_area = self.min_area_ratio * H * W
+        candidates: list[np.ndarray] = []
         subjects: list[np.ndarray] = []
-        cut = 0
+        cut_small = 0
+        cut_bg = 0
 
-        for idx, raw in enumerate(layers):
+        for raw in layers:
             conf = self._layer_to_confidence(raw)
 
             # 缩过边就还原回原尺寸 —— 在置信度图上做双线性缩放再阈值化，
@@ -392,9 +424,39 @@ class VolcengineSegmentProvider(SegmentProvider):
             mask = im.opening(mask, 1)
 
             if int(mask.sum()) < min_area:
-                cut += 1
+                cut_small += 1
+                continue
+            candidates.append(mask)
+
+        # ------------------------------------------------------------ 背景过滤
+        #
+        # ★ EntitySegment 是「实例分割」，它把**背景也当成实体**返回。
+        #   实测这张油画猫图：7 个图层里有 2 个是横跨整幅的背景
+        #   （天空 42.6%、地面 30.4%），另外 5 个才是猫。
+        #   直接把 7 个都当主体，画面上就会压着两张全屏色块 —— 完全毁掉。
+        #
+        # 【判据为什么是"跨幅"而不是"面积大"】
+        #   面积阈值会误杀本来就很大的前景（比如一头占半幅的鲸鱼）。
+        #   而**背景区域的典型特征是横跨整个画面** ——
+        #   天空一定从左到右铺满，地面也是；猫只占 0.16 宽。
+        #   所以判据是：包围盒宽度或高度 ≥ bg_span（默认 0.9）→ 背景。
+        #
+        # 【保底】如果过滤完一个不剩，说明判据不适用于这张图 ——
+        #   宁可全留着（哪怕是背景）也不要返回空，空会让下游完全没有主体可排。
+        for mask in candidates:
+            ys, xs = np.where(mask)
+            if xs.size == 0:
+                continue
+            span_w = (int(xs.max()) - int(xs.min()) + 1) / W
+            span_h = (int(ys.max()) - int(ys.min()) + 1) / H
+            if span_w >= self.bg_span or span_h >= self.bg_span:
+                cut_bg += 1
                 continue
             subjects.append(mask)
+
+        if not subjects and candidates:
+            subjects = candidates
+            cut_bg = 0
 
         subjects.sort(key=lambda m: -int(m.sum()))
 
@@ -414,7 +476,8 @@ class VolcengineSegmentProvider(SegmentProvider):
             params=self._params(),
             notes=[
                 f"EntitySegment 返回 {len(layers)} 个实体图层，保留 {len(subjects)} 个"
-                + (f"（{cut} 个因面积过小被丢弃）" if cut else ""),
+                + (f"（{cut_small} 个面积过小）" if cut_small else "")
+                + (f"（{cut_bg} 个跨幅背景层）" if cut_bg else ""),
                 f"模型自评 seg_score 均值 {mean_score:.3f}"
                 + (f"，明细 {[round(s, 3) for s in scores]}" if scores else ""),
                 "★ 每个图层是模型给出的独立实体 —— 五只猫即使挨着也能分开，"
@@ -425,7 +488,8 @@ class VolcengineSegmentProvider(SegmentProvider):
                 "entity_num": entity_num,
                 "layers": len(layers),
                 "kept": len(subjects),
-                "cut_small": cut,
+                "cut_small": cut_small,
+                "cut_background": cut_bg,
                 "seg_score": scores,
                 "mean_seg_score": mean_score,
                 "send_side": int(max(send.shape[:2])),
