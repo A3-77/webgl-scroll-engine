@@ -52,6 +52,9 @@ uniform float uTime;
 uniform float uHasDepth;     // 0 = 没有深度缓冲，墨线自动降级为纯亮度梯度
 
 uniform float uMono;
+uniform float uBlackPoint;
+uniform float uWhitePoint;
+uniform float uContrast;
 uniform float uHalftone;
 uniform float uHalftoneScale;
 uniform float uHalftoneAngle;
@@ -124,9 +127,6 @@ float inkLine(vec2 uv, float srcLuma) {
   float lD = lumaAt(uv - vec2(0.0, uTexel.y));
   float lumGrad = length(vec2(lR - lL, lU - lD));
 
-  // 阈值化（纪律③）：只保留真正的轮廓，放过毛发级的微观起伏
-  float lumEdge = smoothstep(0.10, 0.45, lumGrad);
-
   // ---- 深度不连续：抓物体与背景的交界 ----
   // 没有深度缓冲时整项归零，墨线优雅降级成纯亮度梯度，不报错
   float depthEdge = 0.0;
@@ -144,7 +144,54 @@ float inkLine(vec2 uv, float srcLuma) {
     depthEdge = smoothstep(uInkThreshold, uInkThreshold * 4.0, gx + gy);
   }
 
-  return max(depthEdge, lumEdge);
+  // 阈值化（纪律③）：只保留真正的轮廓，放过毛发级的微观起伏
+  float lumEdge = smoothstep(0.10, 0.45, lumGrad);
+
+  // ★★ 深度存在时，亮度项必须**得到深度的支持**才画满。
+  //
+  //   没有这一道门的话，「max(depthEdge, lumEdge)」会让**背景的纹理**
+  //   也被描成线 —— 实测（inkEdge=1 + 红色墨）背景里补洞留下的块状痕迹
+  //   整片变红，而真正的物体轮廓反而淹没在里面。
+  //
+  //   这正是字段注释里写的那件事："只用亮度梯度的话，背景的云、水波
+  //   都会被描成线；加上深度之后，只有真正'立着的东西'才会被勾边。"
+  //   但光把两项取 max 是**做不到**这一点的 —— 必须让深度当闸门。
+  //
+  //   留 0.25 的底不是为了好看：物体**内部**的纹理轮廓（猫的胡须、
+  //   领带条纹）深度是连续的，完全掐掉会把它们一起丢掉。
+  float gate = (uHasDepth > 0.5) ? (0.25 + 0.75 * depthEdge) : 1.0;
+
+  return max(depthEdge, lumEdge * gate);
+}
+
+/* ------------------------------------------------------------ 单色分级 */
+
+/**
+ * ①' 单色分级 —— 把素材那点**窄色调范围**拉开。
+ *
+ * ★ 这一级是"照片能不能印出图形感"的分水岭，别把它当成可有可无的调色。
+ *
+ *   实测 cats 素材：整幅画面的亮度只分布在 0.30 ~ 0.91
+ *   （p1 = 0.298，p99 = 0.909，见 docs/PHASE-25-媒介层.md §7.5）。
+ *   直接拿它算墨量「1 - 亮度」，得到的是 0.09 ~ 0.70 —— 中位数只有 0.26，
+ *   于是**每个格子里的网点都是小点**，整幅画印出来是一片浅灰米色。
+ *   看起来像一张褪色的旧照片，而不是印刷品。
+ *
+ *   参考站点不需要这一级，是因为它们的场景是**美术指导过的**
+ *   （深色背景 + 高饱和色块，本来就跨越全色阶）。
+ *   本引擎的输入是普通照片，所以必须补上。
+ *
+ * 两级，顺序不能换：
+ *   1. levels —— 黑白场拉伸。低于黑场的算全黑（网点铺满），高于白场的算全白
+ *   2. contrast —— 绕 0.5 的 S 曲线，增益 = 1 + 对比 × 2
+ *
+ * ★ 这一级的输出**只喂给网点屏**，不改颜色、也不喂墨线：
+ *   ▸ 不喂墨线是因为墨线看的是**梯度**，拉伸会把噪点放大成假边
+ *   ▸ 不改颜色是因为"这张图是什么颜色"不该由印刷参数决定（见纪律②）
+ */
+float gradeTone(float l) {
+  l = clamp((l - uBlackPoint) / max(uWhitePoint - uBlackPoint, 1e-3), 0.0, 1.0);
+  return clamp((l - 0.5) * (1.0 + uContrast * 2.0) + 0.5, 0.0, 1.0);
 }
 
 /* ------------------------------------------------------------ 主函数 */
@@ -157,6 +204,9 @@ void main() {
 
   // ---------------------------------------------------------- ① 单色化
   vec3 c = mix(src, vec3(srcLuma), uMono);
+
+  // ①' 分级 —— 网点屏的墨量从这里来，不是从原始亮度来
+  float inkTone = gradeTone(srcLuma);
 
   // ---------------------------------------------------------- ② 网点
   //
@@ -175,7 +225,12 @@ void main() {
 
     // 点径 ∝ sqrt(墨量)。用 sqrt 而不是线性：
     // 点的**面积**才该正比于墨量，而面积 ∝ 半径²
-    float radius = sqrt(clamp(1.0 - srcLuma, 0.0, 1.0)) * 0.62;
+    //
+    // ★★ 系数必须 ≥ 0.7071（= sqrt(0.5)，格子的外接圆半径）。
+    //    小于它的话，**最黑的像素也铺不满整个格子** ——
+    //    画面在数学上就印不出实黑，只剩一片灰。
+    //    这里取 0.78，留一点余量给抗锯齿的过渡带。
+    float radius = sqrt(clamp(1.0 - inkTone, 0.0, 1.0)) * 0.78;
 
     // 抗锯齿：对 dist 取屏幕导数，得到"一个像素跨过多少格"
     float aa = max(fwidth(dist), 1e-5) * 1.2;

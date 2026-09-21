@@ -204,6 +204,9 @@ build: async ({ aspect }) => {
 |---|---|---|
 | `enabled` | `false` | 总开关。**关掉 = 一个 pass 都不跑**，画面与不开时逐位相同 |
 | `mono` | `0.55` | 去色程度。不建议给到 1 —— 会丢掉素材本身的色彩 |
+| `blackPoint` | `0.12` | **分级**：低于它算全黑（网点铺满） |
+| `whitePoint` | `0.92` | **分级**：高于它算全白（完全不着墨） |
+| `contrast` | `0.30` | **分级**：绕 0.5 的 S 曲线，增益 = 1 + 对比 × 2 |
 | `halftone` | `0.6` | 网点强度。把连续调拆成"墨点的大小" |
 | `halftoneScale` | `5` | 网屏尺寸，单位 **CSS 像素**（内部按 dpr 换算） |
 | `halftoneAngle` | `45` | 网屏角度。印刷上 45° 最不容易出摩尔纹 |
@@ -211,15 +214,21 @@ build: async ({ aspect }) => {
 | `inkThreshold` | `0.06` | 墨线灵敏度。调大 = 只留最硬的边 |
 | `paper` | `0.35` | 纸纹叠加强度 |
 | `paperColor` | `#efe7d6` | 纸色（sRGB） |
-| `inkColor` | `#1a1714` | 墨色（sRGB） |
+| `inkColor` | `#1a1714` | 墨色（sRGB）—— 同时决定**网点**的墨色和**墨线**的颜色 |
 | `dither` | `0` | 有序抖动强度（Bayer 4×4）。默认关 |
 | `ditherLevels` | `6` | 抖动量化级数，最小 2 |
 | `grain` | `0.05` | 持续颗粒强度。**不跟滚动走，按墙钟时间跑** |
 | `grainSpeed` | `1` | 颗粒速度 |
 | `pulse` | `0.35` | 滚动脉冲倍率 —— 和 `site.post` 共用同一个活跃度 |
 
+> **分级（`blackPoint` / `whitePoint` / `contrast`）是照片驱动的关键一级。**
+> 普通照片的亮度只占一小段（实测 cats 素材是 0.30 ~ 0.91），不拉开的话
+> 网点全是小点、整幅画印出来是一片浅灰 —— 像褪色旧照片，不像印刷品。
+> 参考站点不需要这一级，是因为它们的场景本来就跨越全色阶。
+> **怎么量这三个值**见 [`docs/PHASE-25-媒介层.md`](docs/PHASE-25-媒介层.md) §7.6。
+
 > `pulse` 只作用于 `halftone / dither / inkEdge / paper / grain` 这五个**强度**旋钮。
-> `mono / paperColor / inkColor / inkThreshold` 不脉冲 —— 材料本身不该跟着滚动闪。
+> `mono / 分级 / paperColor / inkColor / inkThreshold` 不脉冲 —— 材料本身不该跟着滚动闪。
 
 ---
 

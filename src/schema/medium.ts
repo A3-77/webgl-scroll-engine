@@ -71,6 +71,9 @@
  */
 export const MEDIUM_PRINT: MediumConfig = {
   mono: 0.55,
+  blackPoint: 0.12,
+  whitePoint: 0.92,
+  contrast: 0.3,
   halftone: 0.6,
   halftoneScale: 5,
   halftoneAngle: 45,
@@ -108,6 +111,33 @@ export interface MediumConfig {
    * 0.5 左右能保住色调，同时让网点读起来像"印刷"而不是"噪点"。
    */
   mono?: number;
+
+  /* ---- ①' 单色分级（grade）---- */
+
+  /**
+   * 黑场 0..1。亮度低于它的部分一律算全黑（网点铺满）。
+   *
+   * ★ 这一组（黑场/白场/对比）是**照片能不能印出图形感的关键**。
+   *   实测：cats 素材的亮度挤在 0.70 ~ 0.92 这个窄带里。
+   *   不拉开的话 `1 - 亮度` 只有 0.08 ~ 0.30，网点全是小点，
+   *   整幅画印出来是一坨浅灰米色 —— 像旧照片，不像印刷品。
+   *
+   *   参考站点不需要这一级，是因为它们的场景是**美术指导过的**
+   *   （深色背景 + 高饱和色块，本来就跨越全色阶）。
+   *   本引擎是素材驱动的，输入是普通照片，所以必须补上这一级。
+   */
+  blackPoint?: number;
+  /**
+   * 白场 0..1。亮度高于它的部分一律算全白（完全不着墨）。
+   * 必须大于 `blackPoint`，否则会被引擎钳到 `blackPoint + 0.01`。
+   */
+  whitePoint?: number;
+  /**
+   * 对比 0..1。在拉伸之后再绕 0.5 做一次 S 曲线（增益 = 1 + 对比 × 2）。
+   *
+   * 0 = 只做黑白场拉伸；0.4 左右开始明显；1 = 增益 3，接近纯黑白海报。
+   */
+  contrast?: number;
 
   /* ---- ② 网点 ---- */
 
@@ -207,6 +237,9 @@ export interface MediumConfig {
 /** 一个媒介层旋钮的生效值（pulse 已展开） */
 export interface ResolvedMedium {
   mono: number;
+  blackPoint: number;
+  whitePoint: number;
+  contrast: number;
   halftone: number;
   halftoneScale: number;
   halftoneAngle: number;
@@ -237,10 +270,17 @@ export function resolveMedium(config: MediumConfig, activity = 0): ResolvedMediu
   const p = 1 + clamp01(config.pulse ?? 0) * clamp01(activity);
   const scale = (v: number | undefined, d: number): number => (v ?? d) * p;
 
+  // 黑白场必须拉开，否则 levels 的分母会爆掉（甚至变成负数）
+  const blackPoint = clamp01(config.blackPoint ?? 0);
+  const whitePoint = Math.max(clamp01(config.whitePoint ?? 1), blackPoint + 0.01);
+
   return {
-    // 单色化和纸色不参与脉动 —— 它们是"材料本身"，
+    // 单色化、分级和纸色不参与脉动 —— 它们是"材料本身"，
     // 让纸的底色随滚动变来变去会读成"曝光在抖"，而不是"印刷在呼吸"
     mono: clamp01(config.mono ?? 0),
+    blackPoint,
+    whitePoint,
+    contrast: clamp01(config.contrast ?? 0),
     paperColor: config.paperColor ?? '#efe7d6',
     inkColor: config.inkColor ?? '#1a1714',
     inkThreshold: config.inkThreshold ?? 0.06,

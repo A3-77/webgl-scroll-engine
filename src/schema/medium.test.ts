@@ -70,7 +70,7 @@ describe('resolveMedium —— pulse 展开', () => {
     expect(r.halftone).toBe(1);
   });
 
-  it('★ 材料本身不参与脉动 —— mono / 纸色 / 墨色 / 墨线阈值', () => {
+  it('★ 材料本身不参与脉动 —— mono / 分级 / 纸色 / 墨色 / 墨线阈值', () => {
     const still = resolveMedium({ mono: 0.5, inkThreshold: 0.08, pulse: 1 }, 0);
     const fast = resolveMedium({ mono: 0.5, inkThreshold: 0.08, pulse: 1 }, 1);
 
@@ -79,6 +79,54 @@ describe('resolveMedium —— pulse 展开', () => {
     expect(fast.inkThreshold).toBe(still.inkThreshold);
     expect(fast.paperColor).toBe(still.paperColor);
     expect(fast.inkColor).toBe(still.inkColor);
+  });
+
+  it('★ 分级（黑白场/对比）也不参与脉动 —— 它是"材料的密度"，不是"呼吸的幅度"', () => {
+    const still = resolveMedium(
+      { blackPoint: 0.3, whitePoint: 0.91, contrast: 0.15, pulse: 1 },
+      0,
+    );
+    const fast = resolveMedium(
+      { blackPoint: 0.3, whitePoint: 0.91, contrast: 0.15, pulse: 1 },
+      1,
+    );
+
+    // 让黑场随滚动上下浮动，等于"整幅画的曝光在抽"，不是印刷在呼吸
+    expect(fast.blackPoint).toBe(still.blackPoint);
+    expect(fast.whitePoint).toBe(still.whitePoint);
+    expect(fast.contrast).toBe(still.contrast);
+  });
+});
+
+describe('resolveMedium —— 分级必须退化成恒等', () => {
+  it('★ 不声明分级时必须是恒等映射（blackPoint 0 / whitePoint 1 / contrast 0）', () => {
+    // shader 的 gradeTone 在这组值下是 f(l) = l：
+    //   clamp((l - 0) / 1) → l，再 (l - 0.5) * 1 + 0.5 → l
+    // 如果这里换成别的默认值，所有"只声明了 halftone 的旧配置"画面都会变 ——
+    // 这正是 PHASE 18 那类"配置没动、结果变了"的缺陷。
+    const r = resolveMedium({});
+    expect(r.blackPoint).toBe(0);
+    expect(r.whitePoint).toBe(1);
+    expect(r.contrast).toBe(0);
+  });
+
+  it('★ 白场必须严格大于黑场 —— 否则 levels 的分母会变负，画面反相', () => {
+    // shader 里 max(uWhitePoint - uBlackPoint, 1e-3) 兜住了 0，但兜不住负数
+    const r = resolveMedium({ blackPoint: 0.8, whitePoint: 0.2 });
+    expect(r.whitePoint).toBeGreaterThan(r.blackPoint);
+    expect(r.whitePoint).toBeCloseTo(0.81, 10);
+  });
+
+  it('黑白场相等时也要被拉开 —— 否则分母趋 0，一个像素之差就是全黑或全白', () => {
+    const r = resolveMedium({ blackPoint: 0.5, whitePoint: 0.5 });
+    expect(r.whitePoint - r.blackPoint).toBeGreaterThanOrEqual(0.01);
+  });
+
+  it('黑场/白场/对比都被钳在 0..1', () => {
+    const r = resolveMedium({ blackPoint: -1, whitePoint: 5, contrast: 3 });
+    expect(r.blackPoint).toBe(0);
+    expect(r.whitePoint).toBe(1);
+    expect(r.contrast).toBe(1);
   });
 });
 
@@ -114,5 +162,40 @@ describe('resolveMedium —— 出厂预设', () => {
 
   it('预设里 dither 是关的 —— 它和网点是两种语言，同时开会互相打架', () => {
     expect(resolveMedium(MEDIUM_PRINT, 0).dither).toBe(0);
+  });
+
+  it('预设带一个可用的分级 —— 不然预设印出来是一片浅灰', () => {
+    const r = resolveMedium(MEDIUM_PRINT, 0);
+    expect(r.whitePoint).toBeGreaterThan(r.blackPoint);
+    // 至少要把 10% 的暗部压成实黑、10% 的亮部留成纸白
+    expect(r.blackPoint).toBeGreaterThan(0.05);
+    expect(r.whitePoint).toBeLessThan(0.95);
+  });
+});
+
+describe('网点半径上限 —— 一个曾经印不出实黑的 bug', () => {
+  /**
+   * shader 里：radius = sqrt(1 - inkTone) * K
+   *
+   * 格子是 `fract(p) - 0.5`，所以格子内最远的点距中心 sqrt(0.5) ≈ 0.7071。
+   * **K 必须 ≥ 0.7071**，否则 inkTone = 0（最黑）时半径也够不到角落，
+   * 画面在数学上就印不出实黑 —— 只有一片灰。
+   *
+   * 这里不跑 shader，只把这个不等式钉住，防止有人"调小一点更柔和"。
+   */
+  const K = 0.78;
+  const CELL_CIRCUMRADIUS = Math.SQRT1_2;
+
+  it('★ K 必须大于等于格子外接圆半径，否则最黑的像素也铺不满', () => {
+    expect(K).toBeGreaterThanOrEqual(CELL_CIRCUMRADIUS);
+  });
+
+  it('最黑处半径 ≥ 外接圆半径 → 全黑是可达的', () => {
+    const radiusAtBlack = Math.sqrt(1 - 0) * K;
+    expect(radiusAtBlack).toBeGreaterThanOrEqual(CELL_CIRCUMRADIUS);
+  });
+
+  it('最白处半径为 0 → 纸白是可达的', () => {
+    expect(Math.sqrt(1 - 1) * K).toBe(0);
   });
 });

@@ -125,6 +125,9 @@ export class MediumSystem {
         uHasDepth: { value: 0 },
 
         uMono: { value: 0 },
+        uBlackPoint: { value: 0 },
+        uWhitePoint: { value: 1 },
+        uContrast: { value: 0 },
         uHalftone: { value: 0 },
         uHalftoneScale: { value: 5 },
         uHalftoneAngle: { value: 45 },
@@ -211,6 +214,9 @@ export class MediumSystem {
     u.uTime.value = timeSec;
 
     u.uMono.value = r.mono;
+    u.uBlackPoint.value = r.blackPoint;
+    u.uWhitePoint.value = r.whitePoint;
+    u.uContrast.value = r.contrast;
     u.uHalftone.value = r.halftone;
     // ★ × pixelRatio：halftoneScale 是 CSS 像素，gl_FragCoord 是设备像素。
     //   不换算的话同一个配置在 retina 上网点会细一倍（理由见字段注释）
