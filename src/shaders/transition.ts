@@ -63,6 +63,18 @@ uniform mat4  uProjectionView;
 uniform vec3  uFadeCenterPoint;
 uniform float uDarken;
 
+// ---------------------------------------------------------------- 3D 载体（PHASE 23）
+//
+//   uCarrierPoint   载体此刻的世界坐标
+//   uCarrierFollow  0..1 —— 溶解中心从「章节固定中心」拉向「载体屏幕位置」的强度
+//   uCarrierOrganic 有机边缘强度（0 = 与改造前完全一致的正圆）
+//
+// ★ 这三个 uniform 全为 0 时，本文件的行为与改造前**逐位相同**。
+//   这是硬要求：不声明载体的内容包必须完全不受影响。
+uniform vec3  uCarrierPoint;
+uniform float uCarrierFollow;
+uniform float uCarrierOrganic;
+
 varying vec2 vUv;
 
 // Sample pre-computed noise texture (normalized to [-1, 1])
@@ -72,6 +84,37 @@ float sampleNoise(vec2 uv) {
 
 float easeInOutCubic(float t) {
   return t < 0.5 ? 4.0 * t * t * t : 1.0 - pow(-2.0 * t + 2.0, 3.0) / 2.0;
+}
+
+// ★ 有机距离 —— 溶解边界不再是正圆（PHASE 23）
+//
+//   SKY（shader.se）的做法：在圆形半径上叠加三个不同频率的正弦，
+//   让边界像油墨扩散而不是几何圆。原文是：
+//     sin(angle*3.0 + t*1.5)*1.5 + sin(angle*7.0 + t*2.5) + sin(angle*13.0 + t*0.8)*0.5
+//   再乘一个 0.02 量级的系数。
+//
+//   为什么是三个**非整数倍**的频率：整数倍（3/6/12）会让三个波在
+//   同一相位反复对齐，边界看起来像有棱角的星形；3/7/13 互质，
+//   一个周期里几乎不重复，读起来才像"有机的"。
+//
+//   uCarrierOrganic = 0 时退化为纯 length() —— 与改造前逐位相同。
+float organicDistance(vec2 uv, vec2 center, float t, float amount) {
+  vec2 d = (uv - center) * vec2(uAspect, 1.0);
+  float r = length(d);
+  if (amount <= 0.0001) return r;
+  float angle = atan(d.y, d.x);
+  float wobble =
+      sin(angle * 3.0  + t * 1.5) * 1.5
+    + sin(angle * 7.0  + t * 2.5)
+    + sin(angle * 13.0 + t * 0.8) * 0.5;
+  return r + wobble * 0.02 * amount;
+}
+
+// 把世界坐标点投影到屏幕空间（0..1）。
+// uProjectionView 已经是 projection × viewInverse，这里只差透视除法。
+vec2 projectToScreen(vec3 worldPos) {
+  vec4 clip = uProjectionView * vec4(worldPos, 1.0);
+  return (clip.xy / clip.w) * 0.5 + 0.5;
 }
 
 void main() {
@@ -88,9 +131,18 @@ void main() {
   if (isFallback) {
     sceneCenter = vec2(0.5, 0.65);
   } else {
-    vec4 clipPos = uProjectionView * vec4(uFadeCenterPoint, 1.0);
-    sceneCenter = (clipPos.xy / clipPos.w) * 0.5 + 0.5;
+    sceneCenter = projectToScreen(uFadeCenterPoint);
   }
+
+  // ★ 溶解中心被载体拉走（PHASE 23 的核心）
+  //
+  //   改造前：中心是章节里写死的 fadeCenter，画面从那里均匀扩散 ——
+  //   「没有一个东西在做这件事」的根源。
+  //
+  //   改造后：中心被拉到载体此刻的屏幕位置，于是画面是被飞过的东西擦开的。
+  //   uCarrierFollow = 0 时这一行是恒等变换，行为与改造前一致。
+  vec2 carrierCenter = projectToScreen(uCarrierPoint);
+  sceneCenter = mix(sceneCenter, carrierCenter, uCarrierFollow);
 
   // UV transformation (fancy mode has zoom effect centered on 3D scene origin)
   vec2 currentUV = uv;
@@ -151,8 +203,9 @@ void main() {
   // Threshold calculation
   float threshold;
   if (isHero) {
-    // Aspect-correct the distance for circular (not oval) reveal
-    float dist = length((uv - maskCenter) * vec2(uAspect, 1.0)) * 0.8;
+    // Aspect-correct the distance for circular (not oval) reveal.
+    // 换成 organicDistance —— uCarrierOrganic = 0 时两者完全等价。
+    float dist = organicDistance(uv, maskCenter, uTime, uCarrierOrganic) * 0.8;
     threshold = mix(dist, uv.x,
                     smoothstep(0.6, -0.4, abs(uv.x - sceneCenter.x)) *
                     mix(0.0, 0.4, smoothstep(0.05, 0.5, progress)));
@@ -233,7 +286,32 @@ void main() {
   float glowMult = isHero
     ? mix(glowStrength * 0.5, glowStrength, 0.5 + 0.5 * currentNoise * sin(uTime + uv.x * 10.0))
     : mix(2.0, 10.0, 0.5 + 0.5 * currentNoise * sin(uTime + uv.x * 10.0));
-  outputColor = mix(outputColor, outputColor * glowMult, (1.0 - glowFactor) * glowGate);
+
+  // ★ 发光不许把像素推过 1.0（PHASE 23 期间发现并修复的既有缺陷）
+  //
+  //   【症状】浅色素材在过渡正中间整屏过曝成白，什么都看不见。
+  //     实测：油画猫图（浅灰底，luma≈0.8）在 uProgress≈0.5 时全白，
+  //     而深色素材（参考站点那种暗青底）完全正常。
+  //
+  //   【根因】上面这一行原本是纯粹的**乘法**发光：
+  //     outputColor * glowMult，hero 模式下 glowMult 最高到 40。
+  //     参考站点是深色画面，深色乘 8 刚好是"看得见的辉光" ——
+  //     所以这个写法在原站点上是对的，它没打算通用。
+  //     但浅色像素乘 8 就是 6.4，远超 1.0；再喂给 bloom，
+  //     pmndrs 的 mipmap 模糊会把它摊成一整屏白（比自制的 3 pass 高斯宽得多）。
+  //
+  //   【修法】给每个像素算一个"乘到这个系数刚好到 1.0"的上限，取小值：
+  //     深色 luma=0.10 → 上限 10 → hero 的 8 原样通过（**观感零变化**）
+  //     浅色 luma=0.80 → 上限 1.25 → 峰值停在 1.0（不再过曝，仍有微亮）
+  //     极暗 luma=0.05 → 上限 20 → 8 原样通过
+  //   也就是"只在乘完不会过曝的范围内乘" —— 亮的地方自然少给，暗的地方给足。
+  //
+  //   这与本文件里 edgeGain 的修复是同一类问题的同一个思路：
+  //   素材驱动的引擎不能假设素材是深色的。
+  float baseLuma = dot(outputColor.rgb, vec3(0.299, 0.587, 0.114));
+  float glowCeiling = 1.0 / max(baseLuma, 0.08);
+  float glowScale = min(glowMult, glowCeiling);
+  outputColor = mix(outputColor, outputColor * glowScale, (1.0 - glowFactor) * glowGate);
 
   gl_FragColor = outputColor;
 }

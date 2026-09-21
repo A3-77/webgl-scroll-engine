@@ -202,6 +202,9 @@ export function CanvasHost({ pack, content, audio }: CanvasHostProps) {
           // ★ 内容包声明的胶片风格。不传就用 config/design.ts 的 DEFAULT_POST。
           //   这里只是把"内容包的审美"翻译成"引擎能吃的配置"，引擎依然不认内容包。
           post: pack.site.post,
+          // ★ 3D 过渡载体（PHASE 23）。同样是"内容包声明 → 装配层翻译 → 引擎执行"。
+          //   不声明就是 undefined → 引擎内部按 enabled:false 处理，零开销。
+          carrier: pack.site.carrier,
         });
         composer.setSize(w, h, dpr);
 

@@ -5,8 +5,10 @@ import type { ModelAsset } from './loaders';
 import { SceneManager } from './systems/SceneManager';
 import { TransitionSystem, type TransitionTextures } from './systems/TransitionSystem';
 import { PostSystem, type PostDrive } from './systems/PostSystem';
+import { CarrierSystem } from './systems/CarrierSystem';
 import { DEFAULT_POST } from '../config/design';
 import type { PostConfig } from '../schema/post';
+import type { CarrierConfig } from '../schema/carrier';
 
 /**
  * ★ 渲染编排器 —— 整站视觉的骨架
@@ -65,6 +67,10 @@ export interface ComposerStats {
   drawSize: string;
   /** 加载进显存的贴图数量（含过渡扰动图） */
   textureCount: number;
+  /** 3D 过渡载体这一帧是否可见（PHASE 23） */
+  carrierVisible: boolean;
+  /** 载体沿路径的进度 0..1 */
+  carrierT: number;
 }
 
 export interface ComposerOptions {
@@ -111,6 +117,16 @@ export interface ComposerOptions {
    */
   post?: PostConfig;
   /**
+   * ★ 3D 过渡载体配置（PHASE 23）。
+   *
+   * 不传 / `enabled: false` → 行为与改造前完全一致（纯 2D 阈值场溶解）。
+   *
+   * 为什么是配置而不是代码：素材驱动的原则要求"换内容不用改引擎"。
+   * 想让画面被一个飞过的东西擦开的包在这儿声明一个 preset 就行，
+   * 不愿意的包完全不用知道这个东西存在。
+   */
+  carrier?: CarrierConfig;
+  /**
    * @deprecated 后处理已经统一到 `post`。
    * 保留这个开关只是为了让旧的调用点不炸 —— 它等价于 `post.enabled`。
    * 显式传了 `post` 时本参数被忽略。
@@ -131,6 +147,19 @@ export class Composer {
   /** 出厂前最后一道工序：bloom / 色差 / 颗粒 / 暗角 … */
   private post: PostSystem;
   private enablePost: boolean;
+  /**
+   * 3D 过渡载体（PHASE 23）。
+   *
+   * ★ 它是**独立的 Scene**，不挂进 currentScene / nextScene ——
+   *   挂进去的话它会被自己引发的溶解给溶掉（飞到一半消失一半）。
+   *   独立出来之后，它在过渡 blit **之后**、后处理**之前**叠上去，
+   *   永远完整地压在合成好的画面之上。
+   */
+  private carrier: CarrierSystem;
+  /**
+   * 缓存上次 setCamera 时的宽高比 —— 变了就重算路径（路径要按屏幕半宽算）
+   */
+  private carrierAspect = -1;
 
   /**
    * 过渡 → bloom 的交接纹理。
@@ -150,6 +179,8 @@ export class Composer {
     postActivity: 0,
     drawSize: '0×0',
     textureCount: 0,
+    carrierVisible: false,
+    carrierT: 0,
   };
 
   constructor(options: ComposerOptions) {
@@ -173,6 +204,10 @@ export class Composer {
     this.stats.bloom = this.enablePost;
     this.post = new PostSystem(gl, postConfig);
     this.stats.postEffects = this.post.stats.effectCount;
+
+    // 载体。enabled:false（或根本没传）时 CarrierSystem 内部一律 early-return，
+    // active 为 false —— 下面的渲染与 uniform 都会被跳过，零开销。
+    this.carrier = new CarrierSystem(options.carrier ?? { enabled: false }, models);
 
     // 关掉 three 的自动重置：默认每次 gl.render() 都会清空 info，
     // 那样 stats 只能读到最后一个 pass（也就是 1 个 draw call）。
@@ -205,6 +240,8 @@ export class Composer {
     // ★ 传 CSS 尺寸，不是 drawing buffer 尺寸 —— 理由见 PostSystem.setSize
     this.post.setSize(this.width, this.height);
     this.sceneManager.setAspect(aspect);
+    // 标记载体需要重新算路径 —— 真正的 setCamera 等下一帧拿到相机参数再调
+    this.carrierAspect = -1;
 
     this.stats.drawSize = `${w}×${h}`;
   }
@@ -239,6 +276,21 @@ export class Composer {
       state.viewportH,
     );
 
+    // ---- 载体：按当前相机算路径（aspect 变了才重建），更新姿态 ----
+    // ★ 闸门必须是 ready（只要求物体建好）而不是 active（还要求路径算好）——
+    //   路径正是这个块里调 setCamera 才建的，用 active 会变成循环依赖，
+    //   载体永远不出现且不报错。实测踩过。
+    // ★ 必须在 uProgress 算出来之后，update() 内部用 uProgress 算沿路径进度
+    if (this.carrier.ready) {
+      const cam = frame.current.camera as THREE.PerspectiveCamera;
+      const aspect = this.width / this.height;
+      if (Math.abs(this.carrierAspect - aspect) > 1e-4) {
+        this.carrier.setCamera(cam.position.z, cam.fov, aspect);
+        this.carrierAspect = aspect;
+      }
+      this.carrier.update(uProgress, timeSec, dt);
+    }
+
     /**
      * ★ 后处理活跃度 —— 让效果"跟着滚动呼吸"的驱动量。
      *
@@ -258,6 +310,17 @@ export class Composer {
       velocity: state.velocity,
     };
 
+    // 载体这一帧要喂给 shader 的**纯数据**。active=false 或不可见时为 null，
+    // 此时 shader 里的 uCarrierFollow / uCarrierOrganic 都是 0 —— 与改造前逐位一致。
+    const carrierInput =
+      this.carrier.active && this.carrier.stats.visible
+        ? {
+            position: this.carrier.worldPosition,
+            follow: this.carrier.follow,
+            organic: this.carrier.organic,
+          }
+        : null;
+
     if (this.enablePost) {
       this.transition.render(
         gl,
@@ -267,9 +330,12 @@ export class Composer {
           uProgress,
           timeSec,
           mouse: state.mouse,
+          carrier: carrierInput,
         },
         this.rtComposite,
       );
+      // ③' 载体压在合成画面之上（PHASE 23）
+      this.renderCarrier(gl, frame.current.camera, this.rtComposite);
       // ④ 后处理链 → ⑤ 屏幕
       this.post.render(gl, this.rtComposite.texture, drive, dt);
     } else {
@@ -283,9 +349,11 @@ export class Composer {
           uProgress,
           timeSec,
           mouse: state.mouse,
+          carrier: carrierInput,
         },
         null,
       );
+      this.renderCarrier(gl, frame.current.camera, null);
     }
 
     // ---- stats ----
@@ -296,6 +364,35 @@ export class Composer {
     this.stats.drawCalls = gl.info.render.calls;
     this.stats.triangles = gl.info.render.triangles;
     this.stats.postActivity = this.post.stats.activity;
+    this.stats.carrierVisible = this.carrier.stats.visible;
+    this.stats.carrierT = this.carrier.stats.t;
+  }
+
+  /**
+   * 把 3D 载体叠到刚合成好的画面**之上**（PHASE 23）。
+   *
+   * ★ 为什么必须关掉 autoClear：
+   *   这一步是"在已有画面上再画一个东西"，不是"重新画一张"。
+   *   默认的 autoClear=true 会在 render() 开头把颜色缓冲清掉 ——
+   *   过渡结果就没了，只剩下载体孤零零地飘在黑底上。
+   *
+   * ★ 为什么用 currentScene 的相机：
+   *   过渡 shader 里算载体屏幕位置用的是 uProjectionView（同一台相机）。
+   *   换一台相机的话，飞过的物体和它引发的溶解会对不上，
+   *   看起来像"溶解在跟着一个看不见的东西走"。
+   */
+  private renderCarrier(
+    gl: THREE.WebGLRenderer,
+    camera: THREE.Camera,
+    target: THREE.WebGLRenderTarget | null,
+  ): void {
+    if (!this.carrier.active || !this.carrier.stats.visible) return;
+
+    const prevAuto = gl.autoClear;
+    gl.autoClear = false;
+    gl.setRenderTarget(target);
+    gl.render(this.carrier.scene, camera);
+    gl.autoClear = prevAuto;
   }
 
   /* ------------------------------------------------------------ 清理 */
@@ -304,6 +401,7 @@ export class Composer {
     this.rtComposite?.dispose();
     this.transition.dispose();
     this.post.dispose();
+    this.carrier.dispose();
     this.sceneManager.dispose();
   }
 }

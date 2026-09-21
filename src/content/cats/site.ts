@@ -11,7 +11,7 @@
 import { DESIGN } from '../../config/design';
 import { DEFAULT_TRANSITION_TEXTURES } from '../engine-assets';
 // 依赖方向：content/ → schema/ ✓（契约层是唯一被两边共享的东西）
-import type { AudioConfig, PostConfig } from '../../schema';
+import type { AudioConfig, CarrierConfig, PostConfig } from '../../schema';
 import type { SiteConfig } from '../types';
 
 /**
@@ -134,6 +134,53 @@ const AUDIO: AudioConfig = {
   },
 };
 
+/**
+ * ★ Cats 包的 3D 过渡载体（PHASE 23）
+ * ---------------------------------------------------------------------------
+ * 这是"画面不只是两张图叠化"的那一环：
+ * 一个 3D 物体沿自动生成的曲线飞过，**溶解边界跟着它走** ——
+ * 于是切章读起来是"画面被擦开"，而不是"两张图在混合"。
+ *
+ * 【为什么是 plane 而不是 GLB】
+ *   素材驱动的包不该依赖任何外部模型文件。程序化的"一片纸"
+ *   零素材依赖，而且形状最接近参考站点 shader.se 的飞机轮廓。
+ *   真要做"飞机"的内容包，把 kind 换成 'glb' + model 指到自己的资产即可。
+ *
+ * 【几个值的来历】
+ *   preset 'fly-across' —— SKY 的走向（左下远处 → 右上近处），
+ *     比 'fly-through'（冲向镜头）温和，不抢画面内容
+ *   follow 0.8 —— 溶解中心 80% 跟着载体走。给 1.0 会太"被牵着"，
+ *     留 0.2 让章节自己的 fadeCenter 还有一点影响，边界更耐看
+ *   organic 1 —— 多频正弦的完整强度（SKY 用的就是 1）
+ *   emissive 0.4 —— 比默认 0.35 高一点：油画的亮部本来就多，
+ *     不自发光的话载体会被背景吃掉
+ *   scale 1.6 —— plane 原始尺寸 1.6×0.5 的世界单位，再放大就太抢戏
+ */
+const CARRIER: CarrierConfig = {
+  enabled: true,
+  preset: 'fly-across',
+  kind: 'shape',
+  shape: 'plane',
+  scale: 2.2,
+  // ★ 平面必须 billboard。用 'tangent' 的话平面法线朝前进方向，
+  //   而它是横向飞过画面的 —— 屏幕上只剩一条细线，实测几乎看不见。
+  orient: 'billboard',
+  // ★ 深墨色剪影。素材是浅灰底的油画，纸白载体在上面完全隐形；
+  //   深色在浅底上才读得出"有个东西飞过"。
+  color: '#2b2622',
+  follow: 0.8,
+  organic: 1,
+  // ★ 自发光给足（0.9）。深色物体靠"暗"是看不见的，
+  //   要靠 bloom 在它边缘勾出一圈光晕才读得出"有个东西在飞"。
+  //   0.12 实测太弱，载体在浅色背景上只是一块脏斑。
+  emissive: 0.9,
+  // ★ 必须半透明。素材是浅灰底的油画 ——
+  //   不透明的深色 plane 在浅底上就是一个"洞"（实测比不加载体还难看）。
+  //   0.42 读起来是"一片玻璃飞过"：看得见，又不挡内容。
+  opacity: 0.42,
+  onlyDuringTransition: true,
+};
+
 export const SITE: SiteConfig = {
   title: 'WebGL Scroll Engine — Cats',
   font: DESIGN.font,
@@ -141,4 +188,5 @@ export const SITE: SiteConfig = {
   transitionTextures: { ...DEFAULT_TRANSITION_TEXTURES },
   post: POST,
   audio: AUDIO,
+  carrier: CARRIER,
 };

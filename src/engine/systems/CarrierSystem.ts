@@ -85,7 +85,16 @@ export class CarrierSystem {
   private readonly config: Required<
     Pick<
       CarrierConfig,
-      'preset' | 'kind' | 'shape' | 'scale' | 'orient' | 'follow' | 'organic' | 'emissive'
+      | 'preset'
+      | 'kind'
+      | 'shape'
+      | 'scale'
+      | 'orient'
+      | 'follow'
+      | 'organic'
+      | 'emissive'
+      | 'color'
+      | 'opacity'
     >
   > & { enabled: boolean; onlyDuringTransition: boolean; spin: [number, number, number] };
 
@@ -112,11 +121,13 @@ export class CarrierSystem {
       kind: config.kind ?? (config.model ? 'glb' : 'shape'),
       shape: config.shape ?? 'plane',
       scale: config.scale ?? 1,
-      orient: config.orient ?? 'tangent',
+      orient: config.orient ?? 'billboard',
+      color: config.color ?? '#e8e2d6',
       spin: config.spin ?? [0, 0, 0.6],
       follow: config.follow ?? 0.75,
       organic: config.organic ?? 1,
       emissive: config.emissive ?? 0.35,
+      opacity: config.opacity ?? 1,
       onlyDuringTransition: config.onlyDuringTransition ?? true,
     };
 
@@ -178,7 +189,14 @@ export class CarrierSystem {
       }
     })();
 
-    const color = new THREE.Color('#e8e2d6');
+    // ★ 颜色必须走 config —— 契约里声明了 color 却硬编码成纸白，
+    //   结果是"浅色素材 + 浅色载体"完全看不见。深色素材上纸白是对的，
+    //   浅色素材上就得换成深色剪影。这也是"引擎不能假设素材明暗"的一部分。
+    const color = new THREE.Color(this.config.color);
+    // ★ 不透明度 < 1 时自动切 transparent。
+    //   浅色素材上，一块不透明的深色载体会变成一个"洞"——
+    //   实测油画猫图上比不加载体还难看。见 schema/carrier.ts 的 opacity 说明。
+    const opacity = this.config.opacity;
     const mat = new THREE.MeshStandardMaterial({
       color,
       // ★ 给一点自发光：飞过时会被 bloom 抓到，拖出光晕。
@@ -188,6 +206,10 @@ export class CarrierSystem {
       roughness: 0.55,
       metalness: 0.05,
       side: THREE.DoubleSide,
+      transparent: opacity < 1,
+      opacity,
+      // 半透明物体不该写深度，否则会挡住自己后面本该透出来的东西
+      depthWrite: opacity >= 1,
     });
 
     const mesh = new THREE.Mesh(geo, mat);
@@ -321,7 +343,11 @@ export class CarrierSystem {
     obj.position.copy(tmpPos);
 
     // ---- 朝向 ----
-    if (this.config.orient === 'tangent') {
+    if (this.config.orient === 'billboard') {
+      // 永远正对镜头。相机在 (0, 0, camZ) 朝 -z 看（引擎里所有相机都这样），
+      // 所以"看着相机"就是 lookAt(0, 0, camZ)。
+      obj.lookAt(0, 0, this.camZ);
+    } else if (this.config.orient === 'tangent') {
       this.curve.getTangentAt(t, tmpTan);
       tmpLook.copy(tmpPos).add(tmpTan);
       obj.lookAt(tmpLook);
@@ -354,8 +380,21 @@ export class CarrierSystem {
     return this.stats.ready ? this.config.organic : 0;
   }
 
+  /**
+   * 载体已建好，**但路径还没算**（还没调 setCamera）。
+   *
+   * ★ 存在的理由：装配层需要用它当"该不该喂相机参数"的闸门。
+   *   如果拿 `active` 当闸门会变成循环依赖 ——
+   *   active 要求 curve 存在，而 curve 恰恰要靠这个闸门放行后调 setCamera 才建得出来。
+   *   实测踩过：carrierT 恒为 0，载体永远不出现，且没有任何报错。
+   */
+  get ready(): boolean {
+    return this.stats.ready && this.object !== null;
+  }
+
+  /** 路径也算好了，这一帧可以渲染 */
   get active(): boolean {
-    return this.stats.ready && this.object !== null && this.curve !== null;
+    return this.ready && this.curve !== null;
   }
 
   get closed(): boolean {

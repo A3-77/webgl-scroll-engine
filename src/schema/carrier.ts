@@ -87,11 +87,17 @@ export interface CarrierConfig {
 
   /**
    * 朝向模式。
-   *   'tangent' —— 沿路径切线方向（飞机头朝着前进方向，默认）
-   *   'fixed'   —— 不旋转
-   *   'spin'    —— 匀速自转（配合 `spin`）
+   *   'billboard' —— 永远正对镜头（默认）
+   *                  ★ 平面类载体（plane / 一片纸）必须用这个：
+   *                    用 'tangent' 的话平面法线朝着前进方向，
+   *                    而它又是横向飞过画面的 —— 结果平面**侧对**镜头，
+   *                    屏幕上只剩一条几乎看不见的细线。实测踩过。
+   *   'tangent'   —— 沿路径切线方向（飞机头朝着前进方向）。
+   *                  适合 box / cone / glb 这类有体积的载体。
+   *   'fixed'     —— 不旋转（世界朝向恒定）
+   *   'spin'      —— 匀速自转（配合 `spin`）
    */
-  orient?: 'tangent' | 'fixed' | 'spin';
+  orient?: 'billboard' | 'tangent' | 'fixed' | 'spin';
 
   /** 每秒自转角速度（弧度，xyz 三轴）。orient='spin' 时生效 */
   spin?: [number, number, number];
@@ -122,4 +128,17 @@ export interface CarrierConfig {
    *   这是"有主角"的关键。默认 0.35。
    */
   emissive?: number;
+
+  /**
+   * 不透明度 0..1。默认 1（不透明）。
+   *
+   * ★ 什么时候该调低它：素材是**浅色**的时候。
+   *   深色素材上，一块不透明的深色载体是漂亮的剪影；
+   *   但浅色素材上它会变成一个"洞"—— 实测油画猫图 + 不透明深色 plane，
+   *   画面中央像被挖掉一块，比不加载体还难看。
+   *   调到 0.4 左右就变成"一片玻璃飞过"，既看得见又不挡内容。
+   *
+   * 小于 1 时材质会自动切到 transparent —— 不用额外开关。
+   */
+  opacity?: number;
 }

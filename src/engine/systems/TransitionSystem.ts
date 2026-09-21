@@ -65,6 +65,20 @@ export interface TransitionInput {
   timeSec: number;
   /** 归一化鼠标坐标 [0..1, 0..1] */
   mouse: readonly [number, number];
+  /**
+   * 3D 过渡载体（PHASE 23）。不传 = 无载体，行为与改造前一致。
+   *
+   * 只吃三个**纯数据**而不是整个 CarrierSystem —— 过渡系统不必知道
+   * 载体是怎么飞、沿什么曲线飞的，它只需要"此刻它在哪、影响多大"。
+   */
+  carrier?: {
+    /** 世界坐标 */
+    position: THREE.Vector3;
+    /** 溶解跟随强度 0..1 */
+    follow: number;
+    /** 有机边缘强度 */
+    organic: number;
+  } | null;
 }
 
 export class TransitionSystem {
@@ -98,6 +112,11 @@ export class TransitionSystem {
         uProjectionView: { value: new THREE.Matrix4() },
         uFadeCenterPoint: { value: new THREE.Vector3() },
         uDarken: { value: 0 },
+        // ---- PHASE 23：3D 载体 ----
+        // 全部为 0 时 shader 行为与改造前逐位相同，未声明载体的内容包不受影响
+        uCarrierPoint: { value: new THREE.Vector3() },
+        uCarrierFollow: { value: 0 },
+        uCarrierOrganic: { value: 0 },
       },
     });
     this.quad = createFullscreenQuad(material, this.quadCamera);
@@ -181,6 +200,18 @@ export class TransitionSystem {
       currentScene.camera.matrixWorldInverse,
     );
     (u.uProjectionView.value as THREE.Matrix4).copy(this.projView);
+
+    // ---- 载体：溶解中心跟着它走（PHASE 23） ----
+    // 必须在 uProjectionView 更新**之后**写，两个 uniform 是配套的。
+    const carrier = input.carrier;
+    if (carrier) {
+      (u.uCarrierPoint.value as THREE.Vector3).copy(carrier.position);
+      u.uCarrierFollow.value = carrier.follow;
+      u.uCarrierOrganic.value = carrier.organic;
+    } else {
+      u.uCarrierFollow.value = 0;
+      u.uCarrierOrganic.value = 0;
+    }
 
     gl.setRenderTarget(out);
     gl.clear();

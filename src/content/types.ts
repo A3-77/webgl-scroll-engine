@@ -17,7 +17,13 @@
  *   因为 engine/ 里没有一行 import 指向它。
  */
 
-import type { AssetRegistry, AudioConfig, PostConfig, SceneConfig } from '../schema';
+import type {
+  AssetRegistry,
+  AudioConfig,
+  CarrierConfig,
+  PostConfig,
+  SceneConfig,
+} from '../schema';
 
 /* ------------------------------------------------------------ 站点配置 */
 
@@ -77,6 +83,20 @@ export interface SiteConfig {
    *               { kind:'bloom', intensity:0.7 }] }
    */
   post?: PostConfig;
+
+  /**
+   * ★ 3D 过渡载体（PHASE 23）。
+   *
+   * 不声明 → 纯 2D 阈值场溶解（改造前的行为，逐位一致）。
+   * 声明 `{ enabled: true, preset: 'fly-across' }` →
+   *   一个 3D 物体沿自动生成的曲线飞过画面，且**溶解边界跟着它走**。
+   *
+   * 为什么它是"内容决策"而不是"引擎能力"：
+   *   有没有一个"主角"在做这件事，决定的是这段叙事的语气。
+   *   有的内容想要"画面被擦开"，有的只想要安静的叠化 ——
+   *   这个判断属于内容，不属于引擎。
+   */
+  carrier?: CarrierConfig;
 
   /**
    * ★ 声音 —— 同样属于内容包的审美决策。
