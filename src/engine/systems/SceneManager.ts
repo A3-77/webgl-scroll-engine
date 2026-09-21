@@ -46,6 +46,7 @@ import type { SceneConfig, ScrollState } from '../../schema';
 import { sceneTime } from '../../animation/scrollProgress';
 import { buildScene, type BuiltScene } from '../SceneBuilder';
 import type { ModelAsset } from '../loaders';
+import type { PointerSystem } from './PointerSystem';
 
 /** 解析结果：这一帧要渲染的两个场景 + 各自的时间轴位置 */
 export interface ResolvedFrame {
@@ -68,9 +69,10 @@ export class SceneManager {
     textures: Map<string, THREE.Texture>,
     models: Map<string, ModelAsset>,
     aspect: number,
+    pointerSystem: PointerSystem,
   ): SceneManager {
     return new SceneManager(
-      configs.map((cfg) => buildScene(cfg, textures, models, aspect)),
+      configs.map((cfg) => buildScene(cfg, textures, models, aspect, pointerSystem)),
     );
   }
 

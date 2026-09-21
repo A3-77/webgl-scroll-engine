@@ -22,6 +22,7 @@ import type {
   AudioConfig,
   CarrierConfig,
   MediumConfig,
+  PointerConfig,
   PostConfig,
   SceneConfig,
 } from '../schema';
@@ -117,6 +118,27 @@ export interface SiteConfig {
    * 想快速试：`medium: MEDIUM_PRINT`（`schema/medium.ts` 里的出厂预设）。
    */
   medium?: MediumConfig;
+
+  /**
+   * ★ 指针视差（PHASE 26）—— 继「滚动」「时间」之后的**第三个连续驱动源**。
+   *
+   * 不声明 → 一个像素都不动，相机与改造前逐位相同。
+   * 声明 `{ enabled: true }` 或直接用预设 `POINTER_PARALLAX` →
+   *   画面跟着鼠标 / 触控微微偏，观感是恒定的角度偏移（约 ±2°）。
+   *
+   * 为什么它值得存在：
+   *   滚动决定"故事讲到哪"，时间决定"停着的时候画面是不是死的"，
+   *   而指针决定"你从哪儿看"。少了第三个，画面虽然活着，却**不响应你** ——
+   *   读起来像一段视频，不像一个可以看进去的东西。
+   *
+   * 为什么它是"内容决策"：
+   *   幅度给多大、要不要让镜头跟着走，决定的是这段叙事的语气。
+   *   有的内容要"观众在凝视"，有的要"观众在操控"。
+   *
+   * 参考站点两个都有（shader.se 的 MouseWeightPass 场、
+   * iamsaeed.dev 的 ShotDirector 指针视差），本引擎此前没有。
+   */
+  pointer?: PointerConfig;
 
   /**
    * ★ 声音 —— 同样属于内容包的审美决策。

@@ -12,6 +12,7 @@ import { DESIGN } from '../../config/design';
 import { DEFAULT_TRANSITION_TEXTURES } from '../engine-assets';
 // 依赖方向：content/ → schema/ ✓（契约层是唯一被两边共享的东西）
 import type { AudioConfig, CarrierConfig, MediumConfig, PostConfig } from '../../schema';
+import { POINTER_PARALLAX } from '../../schema';
 import type { SiteConfig } from '../types';
 
 /**
@@ -278,4 +279,9 @@ export const SITE: SiteConfig = {
   carrier: CARRIER,
   // ★ 媒介层（PHASE 25）。不声明 → 不跑任何 pass，画面与之前逐位相同。
   medium: MEDIUM,
+  // ★ 指针视差（PHASE 26）。不声明 → 相机一个像素都不动。
+  //   直接用出厂预设：幅度照搬参考站点（0.035 ≈ 目标距离处 ±2°），
+  //   横纵不对称 [0.35, 0.25]（人眼对横向更敏感，纵向给满会晕），
+  //   0.12s 一阶低通（指针是跳变输入，不平滑会"啪"地跳一下）。
+  pointer: POINTER_PARALLAX,
 };

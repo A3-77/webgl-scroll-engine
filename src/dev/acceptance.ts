@@ -23,6 +23,7 @@
  *     ⑤ Camera 有明显空间运动       —— 量 z / y 的行程
  *     ⑥ Transition 用 RT + Shader  —— 检查双 RenderTarget 与 uProgress
  *     ⑦⑧ 素材驱动（换图/加图不改代码）—— 检查包形态：有 build、无静态 scenes
+ *     ⑩~⑰ 引擎能力覆盖            —— 遍历内容包**实际声明的**能力逐项跑一遍
  *
  *   不可测（需要构建期动作，见 README 的手工步骤）：
  *     ① 删除内容包后引擎仍可运行     —— 要真删目录再构建
@@ -34,6 +35,8 @@
  */
 
 /* ------------------------------------------------------------ 类型 */
+
+import { cameraTracksOf } from '../schema';
 
 export interface CheckResult {
   /** 对应验收标准的编号（①②③…），便于对照路线图 */
@@ -95,6 +98,46 @@ function engine(): EngineHandle | null {
   return (window as unknown as Record<string, unknown>).__ENGINE__ as EngineHandle | null;
 }
 
+/**
+ * ★ 白盒适配层
+ * ===========================================================================
+ * 验收要量的东西 —— BuiltScene 的相机与图层、过渡的双 RenderTarget、
+ * 过渡 shader 的 uniforms —— **都是引擎内部状态**，字段是私有的。
+ *
+ * ---------------------------------------------------------------------------
+ * 【为什么收敛到一个函数里，而不是散在各处】
+ *
+ *   PHASE 4~9 把引擎拆成 Composer + 各个 System 之后，
+ *   本文件里原先散落的 `composer.scenes` / `composer.rtCurrent` /
+ *   `composer.transitionQuad` **全部失效**了 ——
+ *   而它们只表现为"某项 FAIL"，非常容易被当成"功能坏了"，
+ *   实际上是被测对象搬了家（实测：④⑤⑥ 三项从 v0.1.0 之后一直是这样）。
+ *
+ *   现在所有私有访问都从这里走。下次再重构，TypeScript 仍然拦不住拼写，
+ *   但至少只需要改这一处，而不是全文搜索。
+ *
+ * ⚠️ 改动引擎的私有结构时，回来更新这个函数，并跑一遍 `?accept=1`。
+ * ===========================================================================
+ */
+function internals(e: EngineHandle): {
+  /** 每个场景的 BuiltScene（相机 + 图层 + applyTime） */
+  scenes: any[];
+  /** 过渡用的双缓冲：current / next 各一张离屏纹理 */
+  rtCurrent: any;
+  rtNext: any;
+  /** 过渡 shader 的材质 uniforms（uProgress / tNoise / tMudNormal / uIsHero） */
+  uniforms: any;
+} {
+  const composer = e.composer as any;
+  const transition = composer?.transition;
+  return {
+    scenes: (composer?.sceneManager?.scenes ?? []) as any[],
+    rtCurrent: transition?.rtCurrent,
+    rtNext: transition?.rtNext,
+    uniforms: transition?.quad?.mesh?.material?.uniforms,
+  };
+}
+
 function ok(id: string, label: string, detail: string): CheckResult {
   return { id, label, status: 'PASS', detail };
 }
@@ -125,7 +168,10 @@ function checkScenes(e: EngineHandle): CheckResult {
     if (!bg) problems.push(`${s.id} 缺背景（没有 role: 'background' 的对象）`);
     const subjects = s.objects?.filter((o: any) => o.role === 'subject') ?? [];
     if (!subjects.length) problems.push(`${s.id} 没有 role: 'subject' 的对象`);
-    if (!s.camera?.tracks?.length) problems.push(`${s.id} 相机没有轨道`);
+    // ★ PHASE 26：`camera.tracks` 可能**是空的** —— 轨道由 `camera.move`
+    //   （镜头语言）在 `cameraTracksOf` 里展开。所以要问"生效轨道"，
+    //   而不是裸的 `camera.tracks`，否则自动构图的场景会被误判成"没轨道"。
+    if (!cameraTracksOf(s.camera).length) problems.push(`${s.id} 相机没有轨道（也没有运镜）`);
     if (typeof s.heightVh !== 'number' || s.heightVh <= 0) problems.push(`${s.id} heightVh 非法`);
   });
 
@@ -197,7 +243,7 @@ function checkObjectMotion(e: EngineHandle): CheckResult {
   const id = '④';
   const label = 'Scene 内多个对象独立运动';
 
-  const built = e.composer?.scenes?.[0];
+  const built = internals(e).scenes[0];
   if (!built) return bad(id, label, '拿不到第 1 个场景');
 
   const ts = [0, 0.25, 0.5, 0.75, 1];
@@ -285,36 +331,120 @@ function checkObjectMotion(e: EngineHandle): CheckResult {
   );
 }
 
-/** ⑤ 相机空间运动：量 z / y / roll 的行程 */
+/**
+ * 相机当前的朝向（世界空间单位向量，= 相机 −z 轴）。
+ *
+ * 直接从 quaternion 算，不 import THREE —— 本文件刻意保持零依赖。
+ * 公式：v' = v + w·t + q.xyz × t，其中 t = 2·(q.xyz × v)，v = (0, 0, −1)。
+ */
+function forwardOf(cam: any): [number, number, number] {
+  const q = cam.quaternion;
+  const vx = -2 * q.w * q.y - 2 * q.z * q.x;
+  const vy = 2 * q.w * q.x - 2 * q.z * q.y;
+  const vz = -1 + 2 * q.x * q.x + 2 * q.y * q.y;
+  const len = Math.hypot(vx, vy, vz) || 1;
+  return [vx / len, vy / len, vz / len];
+}
+
+/**
+ * ⑤ 相机空间运动：量整段行程 + 视线摆动
+ *
+ * ---------------------------------------------------------------------------
+ * 【★ 为什么量"行程"而不是"首尾差值"】
+ *
+ *   改造前所有运镜都是单向的（推进 + 平移），首尾差值就等于行程。
+ *   PHASE 26 之后 `hold` 是**出去再回来**的（x 在 t=0.5 到最远、t=1 归零），
+ *   首尾差值恒为 0 —— 用老写法会报"相机 y 只走了 0.00 个单位"，
+ *   而实际上相机一直在动。所以改成在整个 t 上采样，取 max − min。
+ *
+ * 【★ 为什么要量"视线摆动"】
+ *
+ *   这是 PHASE 26 新增的能力：相机有了 `target`，会**转**。
+ *   只量位置行程是测不出这件事的 —— 镜头可以原地不动地摇（pan/tilt）。
+ *   视线摆动的角度才是"镜头在运动"的直接证据。
+ */
 function checkCamera(e: EngineHandle): CheckResult {
   const id = '⑤';
   const label = 'Camera 有明显空间运动';
 
-  const built = e.composer?.scenes?.[0];
-  if (!built) return bad(id, label, '拿不到第 1 个场景');
+  const scenes = internals(e).scenes;
+  if (!scenes.length) return bad(id, label, '拿不到任何场景');
 
-  built.applyTime(0);
-  const a = { z: built.camera.position.z, y: built.camera.position.y, roll: built.camera.rotation.z };
-  built.applyTime(1);
-  const b = { z: built.camera.position.z, y: built.camera.position.y, roll: built.camera.rotation.z };
+  const N = 24;
+  const per: Array<{ si: number; dx: number; dy: number; dz: number; swing: number }> = [];
 
-  const dz = Math.abs(b.z - a.z);
-  const dy = Math.abs(b.y - a.y);
-  const droll = Math.abs(b.roll - a.roll);
+  for (let si = 0; si < scenes.length; si++) {
+    const built = scenes[si];
+    const xs: number[] = [];
+    const ys: number[] = [];
+    const zs: number[] = [];
+    const dirs: Array<[number, number, number]> = [];
+
+    for (let i = 0; i <= N; i++) {
+      built.applyTime(i / N);
+      const p = built.camera.position;
+      xs.push(p.x);
+      ys.push(p.y);
+      zs.push(p.z);
+      dirs.push(forwardOf(built.camera));
+    }
+
+    const span = (a: number[]): number => Math.max(...a) - Math.min(...a);
+
+    // 视线摆动：所有采样两两之间的最大夹角
+    let maxAngle = 0;
+    for (let i = 0; i < dirs.length; i++) {
+      for (let j = i + 1; j < dirs.length; j++) {
+        const a = dirs[i];
+        const b = dirs[j];
+        const dot = Math.min(Math.max(a[0] * b[0] + a[1] * b[1] + a[2] * b[2], -1), 1);
+        maxAngle = Math.max(maxAngle, Math.acos(dot));
+      }
+    }
+
+    per.push({
+      si,
+      dx: span(xs),
+      dy: span(ys),
+      dz: span(zs),
+      swing: (maxAngle * 180) / Math.PI,
+    });
+  }
+
+  // ★ 取**所有章节的最大值**，而不是只看第 1 章。
+  //   运镜是按 MOVE_CYCLE 分配的，第 1 章可能是 `hold`（本来就几乎不动）——
+  //   拿它当"相机有没有动"的判据会误报。测的是"这套内容里相机确实在运动"。
+  const worstZ = Math.max(...per.map((p) => p.dz));
+  const worstMove = Math.max(...per.map((p) => p.dx + p.dy + p.dz));
+  const worstSwing = Math.max(...per.map((p) => p.swing));
+
+  const detail =
+    per
+      .map(
+        (p) =>
+          `S${String(p.si + 1).padStart(2, '0')}: x ${p.dx.toFixed(2)} / y ${p.dy.toFixed(2)} / z ${p.dz.toFixed(2)}，摆动 ${p.swing.toFixed(2)}°`,
+      )
+      .join('；') + `（每章 ${N + 1} 个采样点）`;
 
   // 阈值是"肉眼能看出来"的量级：
   //   z 行程 < 1 个单位 → 几乎看不出推进
-  //   y 行程 < 0.2      → 视差弱到像静态
-  if (dz < 1) return bad(id, label, `相机 z 只走了 ${dz.toFixed(2)} 个单位，看不出推进`);
-  if (dy < 0.2) return bad(id, label, `相机 y 只走了 ${dy.toFixed(2)} 个单位，视差太弱`);
+  //   位置行程（x/y/z 合计）< 0.5 → 视差弱到像静态
+  //   视线摆动 < 0.5° → 镜头其实没在"看"，只是平移了一张图（缺 target）
+  if (worstZ < 1) {
+    return bad(id, label, `相机 z 最多只走了 ${worstZ.toFixed(2)} 个单位，看不出推进`);
+  }
+  if (worstMove < 0.5) {
+    return bad(id, label, `相机位置总行程最大只有 ${worstMove.toFixed(2)} 个单位，视差太弱`);
+  }
+  if (worstSwing < 0.5) {
+    return bad(
+      id,
+      label,
+      `视线最多只摆了 ${worstSwing.toFixed(2)}° —— 相机没有"看"，只是平移了一张图（缺 target）`,
+    );
+  }
 
-  return ok(
-    id,
-    label,
-    `z ${a.z.toFixed(2)}→${b.z.toFixed(2)}（行程 ${dz.toFixed(2)}）  ` +
-      `y ${a.y.toFixed(2)}→${b.y.toFixed(2)}（行程 ${dy.toFixed(2)}）  ` +
-      `roll ±${droll.toFixed(4)}`,
-  );
+  return ok(id, label, detail);
 }
 
 /** ⑥ 过渡：双 RenderTarget 真的存在，且 uProgress 会随滚动变化 */
@@ -322,14 +452,14 @@ async function checkTransition(e: EngineHandle): Promise<CheckResult> {
   const id = '⑥';
   const label = 'Transition 用 RenderTarget + Shader + Noise';
 
-  const c = e.composer;
+  const c = internals(e);
   if (!c?.rtCurrent || !c?.rtNext) return bad(id, label, '找不到 rtCurrent / rtNext');
 
   if (c.rtCurrent.texture === c.rtNext.texture) {
     return bad(id, label, 'rtCurrent 与 rtNext 是同一张纹理 —— 没有真正的双缓冲');
   }
 
-  const uniforms = c.transitionQuad?.mesh?.material?.uniforms;
+  const uniforms = c.uniforms;
   if (!uniforms) return bad(id, label, '找不到过渡 quad 的 uniforms');
 
   const hasNoise = !!uniforms.tNoise?.value;
@@ -509,7 +639,7 @@ function scanObjects(
   pred: (cfg: any) => boolean,
 ): Array<{ si: number; li: number; id: string }> {
   const out: Array<{ si: number; li: number; id: string }> = [];
-  (e.composer?.scenes ?? []).forEach((built: any, si: number) => {
+  (internals(e).scenes).forEach((built: any, si: number) => {
     (built.config?.objects ?? []).forEach((cfg: any, li: number) => {
       if (pred(cfg)) out.push({ si, li, id: cfg.id });
     });
@@ -539,7 +669,7 @@ function checkParallax(e: EngineHandle): CheckResult {
   const noMotion: string[] = [];
 
   for (const { si, li, id: objId } of found) {
-    const built = e.composer.scenes[si];
+    const built = internals(e).scenes[si];
     const layer = built.layers[li];
     const declared = layer.parallax;
 
@@ -590,7 +720,7 @@ function checkCameraDamping(e: EngineHandle): CheckResult {
   const id = '⑪';
   const label = 'camera damping 相机阻尼';
 
-  const found = (e.composer?.scenes ?? [])
+  const found = internals(e).scenes
     .map((built: any, si: number) => ({ si, damping: built.config?.camera?.damping ?? 0 }))
     .filter((x: any) => x.damping > 0);
 
@@ -598,7 +728,7 @@ function checkCameraDamping(e: EngineHandle): CheckResult {
   const samples: string[] = [];
 
   for (const { si, damping } of found) {
-    const built = e.composer.scenes[si];
+    const built = internals(e).scenes[si];
     const cam = built.camera;
 
     // 先让阻尼收敛到 t=0 的状态
@@ -644,7 +774,7 @@ function checkBlending(e: EngineHandle): CheckResult {
   const samples: string[] = [];
 
   for (const { si, li, id: objId } of found) {
-    const layer = e.composer.scenes[si].layers[li];
+    const layer = internals(e).scenes[si].layers[li];
     const mat = layer.mesh?.material;
     if (!mat) {
       problems.push(`${objId} 不是平面对象，测不了 blending`);
@@ -673,7 +803,7 @@ function checkVisibleTrack(e: EngineHandle): CheckResult {
   const samples: string[] = [];
 
   for (const { si, li, id: objId } of found) {
-    const built = e.composer.scenes[si];
+    const built = internals(e).scenes[si];
     const layer = built.layers[li];
 
     built.applyTime(0);
@@ -698,10 +828,10 @@ function checkFovTrack(e: EngineHandle): CheckResult {
   const id = '⑭';
   const label = 'camera fov 轨道';
 
-  const found = (e.composer?.scenes ?? [])
-    .map((built: any, si: number) => ({
+  const found = internals(e)
+    .scenes.map((built: any, si: number) => ({
       si,
-      has: (built.config?.camera?.tracks ?? []).some((t: any) => t.path === 'fov'),
+      has: cameraTracksOf(built.config?.camera).some((t: any) => t.path === 'fov'),
     }))
     .filter((x: any) => x.has);
 
@@ -709,7 +839,7 @@ function checkFovTrack(e: EngineHandle): CheckResult {
   const samples: string[] = [];
 
   for (const { si } of found) {
-    const built = e.composer.scenes[si];
+    const built = internals(e).scenes[si];
     built.applyTime(0);
     const f0 = built.camera.fov;
     built.applyTime(1);
@@ -735,7 +865,7 @@ function checkTint(e: EngineHandle): CheckResult {
   const samples: string[] = [];
 
   for (const { si, li, id: objId } of found) {
-    const layer = e.composer.scenes[si].layers[li];
+    const layer = internals(e).scenes[si].layers[li];
     const cfg = layer.config;
     const mat = layer.mesh?.material;
     if (!mat) continue;
@@ -771,7 +901,7 @@ async function checkTransitionModes(e: EngineHandle): Promise<CheckResult> {
   }
 
   // 滚到会触发 sweep 的那一段，读 shader 的 uIsHero
-  const uniforms = e.composer?.transitionQuad?.mesh?.material?.uniforms;
+  const uniforms = internals(e).uniforms;
   if (!uniforms) return bad(id, label, '找不到过渡 quad');
 
   const heights: number[] = e.sectionStore.getState().heights ?? [];
@@ -804,6 +934,137 @@ async function checkTransitionModes(e: EngineHandle): Promise<CheckResult> {
   if (!sawRadial) return bad(id, label, '滚遍全部章节，uIsHero 一直是 0 —— radial 从未被渲染');
 
   return ok(id, label, `两种模式都实际渲染过（radial → uIsHero=1，sweep → uIsHero=0）`);
+}
+
+/**
+ * ⑰ 运行时换运镜：换一份 camera config 之后，上一份**不能留下残留**
+ *
+ * ---------------------------------------------------------------------------
+ * 【这一项是怎么来的】
+ *
+ *   它不是设计出来的，是**实测踩出来的**。
+ *
+ *   验证六个运镜时，我把它们逐个换到同一个真实场景上量位姿，输出是：
+ *     crash → fov 28→32 ✓
+ *     rise  → fov 28→28 ✗   ← 应该从 32 开始
+ *
+ *   `rise` 根本没有 fov 轨道，却停在 `crash` 留下的 28° 上，
+ *   画面窄了一圈而没有任何东西解释它 —— 正是"动画看着不对"的一种。
+ *
+ *   根因：`evaluateTracks` **只写不删**（它复用 out 对象避免每帧分配），
+ *   所以换过 config 之后，旧路径会永远留在缓存里继续被读。
+ *   修复在 `CameraSystem.syncConfig`（只删失效的键，保住仍在的）。
+ *
+ * ---------------------------------------------------------------------------
+ * 【为什么值得留在验收里，而不是只写个单测】
+ *
+ *   单测直接构造 CameraSystem，测的是"这个类写对了吗"。
+ *   这一项走的是**真实引擎路径** —— 和 `Composer.refreshLayout`
+ *   （改窗口大小触发重新构图）完全同一条：`SceneBuilder.applyCameraConfig`
+ *   → `CameraSystem.syncConfig`。它测的是"接起来之后还对吗"。
+ *
+ *   顺带把六个运镜的**位姿表**打出来。这张表本身就是文档：
+ *   每个运镜的行程与视线摆动一眼可见，改动运镜实现时会立刻看到差异。
+ * ---------------------------------------------------------------------------
+ */
+function checkMoveSwap(e: EngineHandle): CheckResult {
+  const id = '⑰';
+  const label = '运行时替换运镜（PHASE 26）';
+
+  const scenes = internals(e).scenes;
+  if (!scenes.length) return bad(id, label, '拿不到任何场景');
+
+  const built = scenes[0];
+  const original = built.config?.camera;
+  if (!original) return skip(id, label, '第 1 个场景没有相机配置');
+
+  const baseFov: number = original.fov;
+  const subject: [number, number, number] = original.move?.subject ?? original.target ?? [0, 0, 0];
+  const approach: number =
+    original.move?.approach ?? Math.abs(original.z - subject[2]) * 0.3;
+
+  // ★ 顺序有讲究：`crash` 之后紧跟 `rise` ——
+  //   这正是当初发现泄漏的那一对（crash 收窄 fov，rise 没有 fov 轨道）。
+  const KINDS = ['hold', 'crash', 'rise', 'dolly', 'orbit', 'whip'] as const;
+  const rows: Array<{ kind: string; fov: string; swing: number; dz: number }> = [];
+  const problems: string[] = [];
+
+  try {
+    for (const kind of KINDS) {
+      built.applyCameraConfig({
+        ...original,
+        tracks: [], // 清掉原轨道，只留运镜 —— 否则测的是两者叠加
+        move: { kind, subject, approach },
+      });
+
+      const N = 24;
+      const fovs: number[] = [];
+      const zs: number[] = [];
+      const dirs: Array<[number, number, number]> = [];
+
+      for (let i = 0; i <= N; i++) {
+        built.applyTime(i / N);
+        fovs.push(built.camera.fov);
+        zs.push(built.camera.position.z);
+        dirs.push(forwardOf(built.camera));
+      }
+
+      // 视线摆动：所有采样两两之间的最大夹角
+      let maxAngle = 0;
+      for (let i = 0; i < dirs.length; i++) {
+        for (let j = i + 1; j < dirs.length; j++) {
+          const a = dirs[i];
+          const b = dirs[j];
+          const dot = Math.min(Math.max(a[0] * b[0] + a[1] * b[1] + a[2] * b[2], -1), 1);
+          maxAngle = Math.max(maxAngle, Math.acos(dot));
+        }
+      }
+
+      const fovMin = Math.min(...fovs);
+      const fovMax = Math.max(...fovs);
+      const swing = (maxAngle * 180) / Math.PI;
+
+      rows.push({
+        kind,
+        fov: fovMin === fovMax ? fovMin.toFixed(0) : `${fovMin.toFixed(0)}~${fovMax.toFixed(0)}`,
+        swing,
+        dz: Math.max(...zs) - Math.min(...zs),
+      });
+
+      // ★ 核心断言：**只有 `crash` 收窄视野**。
+      //   其余运镜换上来之后 fov 必须精确回到配置值 ——
+      //   否则就是上一份 config 的 fov 轨道还留在缓存里。
+      if (kind === 'crash') {
+        if (Math.abs(fovMax - baseFov) > 1e-6) {
+          problems.push(`crash 起点 fov ${fovMax.toFixed(1)}°，应为 ${baseFov}°`);
+        } else if (Math.abs(fovMin - baseFov) < 1e-3) {
+          problems.push(`crash 的 fov 没有变化（一直是 ${fovMin.toFixed(1)}°）`);
+        }
+      } else if (Math.abs(fovMin - baseFov) > 1e-6 || Math.abs(fovMax - baseFov) > 1e-6) {
+        problems.push(
+          `${kind} 的 fov 是 ${fovMin.toFixed(1)}~${fovMax.toFixed(1)}°，应为 ${baseFov}°` +
+            `（残留了别的运镜的 fov）`,
+        );
+      }
+    }
+  } finally {
+    // 恢复 —— 验收不该留下副作用（后面的检查与渲染循环都依赖原配置）
+    built.applyCameraConfig(original);
+  }
+
+  // 换过一圈之后，至少要有一种运镜真的"看"了 —— 这是 target 生效的证据
+  const bestSwing = Math.max(...rows.map((r) => r.swing));
+  if (bestSwing < 5) {
+    problems.push(`六个运镜里视线最大只摆了 ${bestSwing.toFixed(2)}° —— 换 config 之后相机不再"看"了`);
+  }
+
+  const detail =
+    rows
+      .map((r) => `${r.kind}: fov ${r.fov}°，摆动 ${r.swing.toFixed(1)}°，z 行程 ${r.dz.toFixed(1)}`)
+      .join('；') + '（换过一圈后已恢复原配置）';
+
+  if (problems.length) return bad(id, label, problems.join('；') + '｜' + detail);
+  return ok(id, label, detail);
 }
 
 /* ------------------------------------------------------------ 主入口 */
@@ -841,6 +1102,7 @@ export async function runAcceptance(): Promise<AcceptanceReport> {
     checkVisibleTrack(e),
     checkFovTrack(e),
     checkTint(e),
+    checkMoveSwap(e),
     await checkTransitionModes(e),
 
     await checkPerf(),

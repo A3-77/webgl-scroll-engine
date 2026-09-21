@@ -11,6 +11,9 @@ import { DEFAULT_POST } from '../config/design';
 import type { PostConfig } from '../schema/post';
 import type { CarrierConfig } from '../schema/carrier';
 import type { MediumConfig } from '../schema/medium';
+import type { PointerConfig } from '../schema/pointer';
+import { resolvePointer } from '../schema/pointer';
+import { PointerSystem } from './systems/PointerSystem';
 
 /**
  * ★ 渲染编排器 —— 整站视觉的骨架
@@ -77,6 +80,11 @@ export interface ComposerStats {
   mediumActive: boolean;
   /** 本帧展开后的网点强度 —— 看它就能判断媒介层的 pulse 有没有在工作 */
   mediumHalftone: number;
+  /** 指针视差是否生效（PHASE 26）。受 reducedMotion 影响 */
+  pointerActive: boolean;
+  /** 平滑后的指针值 [-1,1]，中心原点、+y 向上 */
+  pointerX: number;
+  pointerY: number;
 }
 
 export interface ComposerOptions {
@@ -146,6 +154,16 @@ export interface ComposerOptions {
    */
   medium?: MediumConfig;
   /**
+   * ★ 指针视差配置（PHASE 26）。
+   *
+   * 不传 / `enabled: false` → 相机一个像素都不动，与改造前逐位相同。
+   *
+   * 引擎在这里只接受**已经补全的**配置：`reducedMotion` 的折算发生在
+   * `resolvePointer()` 里，而"当前系统是不是要求减少动态效果"由**应用层**观测
+   * （引擎层不碰 `window`），通过 `setReducedMotion()` 告知。
+   */
+  pointer?: PointerConfig;
+  /**
    * @deprecated 后处理已经统一到 `post`。
    * 保留这个开关只是为了让旧的调用点不炸 —— 它等价于 `post.enabled`。
    * 显式传了 `post` 时本参数被忽略。
@@ -184,6 +202,27 @@ export class Composer {
    */
   private medium: MediumSystem;
   /**
+   * 指针视差（PHASE 26）。
+   *
+   * ★ 全站**只有一个**实例（不像场景那样每章一份）——
+   *   指针是全局输入，平滑状态也只有一份。各场景只读它的偏移。
+   *   这和 `MediumSystem` 注入给 `TransitionSystem` 是同一个模式。
+   *
+   * ★ 引擎不自己观测 `prefers-reduced-motion`（引擎层不碰 `window`）——
+   *   由应用层通过 `setReducedMotion()` 告知，
+   *   在这里折算进 `enabled`，是"关掉"这件事的唯一真相来源。
+   */
+  private pointer: PointerSystem;
+  /**
+   * 内容包声明的**原始**指针配置。
+   *
+   * ★ 必须留一份原始值：`setReducedMotion` 要重新走一遍 `resolvePointer`，
+   *   而 `resolvePointer` 吃的是原始配置、吐的是折算后的配置。
+   *   只留折算结果的话，切换 reducedMotion 之后就没法还原了。
+   */
+  private readonly pointerConfig?: PointerConfig;
+  private reducedMotion = false;
+  /**
    * 缓存上次 setCamera 时的宽高比 —— 变了就重算路径（路径要按屏幕半宽算）
    */
   private carrierAspect = -1;
@@ -210,6 +249,9 @@ export class Composer {
     carrierT: 0,
     mediumActive: false,
     mediumHalftone: 0,
+    pointerActive: false,
+    pointerX: 0,
+    pointerY: 0,
   };
 
   constructor(options: ComposerOptions) {
@@ -220,7 +262,13 @@ export class Composer {
 
     // 建场景。注意每个 section 一个独立 THREE.Scene + 独立 PerspectiveCamera
     // （真实站点也是这样：每个章节有自己的 camera 关键帧轨道，互不干扰）
-    this.sceneManager = SceneManager.build(options.scenes, textures, models, 1);
+    //
+    // ★ 指针系统必须在建场景**之前**建好并注入 —— 场景在构造时会立刻跑一次
+    //   applyTime(0) 来避免首帧闪烁，那一次就会读 pointerSystem 的偏移。
+    this.pointerConfig = options.pointer;
+    this.pointer = new PointerSystem(resolvePointer(this.pointerConfig, this.reducedMotion));
+    this.stats.pointerActive = this.pointer.enabled;
+    this.sceneManager = SceneManager.build(options.scenes, textures, models, 1, this.pointer);
 
     // ★ 媒介层必须先于 TransitionSystem 构造 —— 过渡系统要拿它来重绘场景纹理
     //   （顺序反过来的话，过渡系统拿不到 medium，媒介层就永远不生效且不报错）
@@ -298,7 +346,21 @@ export class Composer {
     // ① 解析：这一帧要哪两个场景，各自播到哪
     const frame = this.sceneManager.resolve(state);
 
+    // ①' 指针平滑（PHASE 26）—— **每帧只推进一次**。
+    //    它是全局输入，两个场景共用同一份平滑状态；
+    //    放进 applyTime 里会被推两次（current + next），平滑速度就翻倍了。
+    this.pointer.apply(dt, state.mouse);
+
     // ② 求值两个场景（顺序无关：两个场景不共享任何 Object3D）
+    //
+    // ★ 先告知"定型"状态再求值：指针视差只在**已定型的镜头**里生效
+    //   （参考站点：`sample.transition === null && shotKind is hold|dolly`）。
+    //   `frame.next` 存在就意味着当前处于过场中 —— 此时两个场景都不该吃指针偏移，
+    //   否则溶解边界上两层会朝同一方向错开。
+    //   顺序不能反：applyTime 里读的就是这个标志。
+    frame.current.setSettled(frame.next === null);
+    if (frame.next) frame.next.setSettled(false);
+
     frame.current.applyTime(frame.currentT, dt);
     if (frame.next) frame.next.applyTime(frame.nextT, dt);
 
@@ -416,6 +478,27 @@ export class Composer {
     this.stats.carrierVisible = this.carrier.stats.visible;
     this.stats.carrierT = this.carrier.stats.t;
     this.stats.mediumHalftone = this.medium.stats.halftone;
+    this.stats.pointerActive = this.pointer.enabled;
+    this.stats.pointerX = this.pointer.value[0];
+    this.stats.pointerY = this.pointer.value[1];
+  }
+
+  /**
+   * 告知引擎"当前系统是否要求减少动态效果"（PHASE 26）。
+   *
+   * ★ 为什么由外部告知而不是引擎自己 `matchMedia`：
+   *   引擎层刻意不碰 `window`（`grep -rn "window\." src/engine` 只有一处
+   *   AudioSystem 的 setTimeout）。保持这条边界，引擎才能在无 DOM 环境里跑测试。
+   *
+   * ★ 关掉时是**整条关掉**（`enabled → false` + 状态归零），不是只调小幅度 ——
+   *   前庭功能敏感的用户需要的是"别动"，不是"动得少一点"。
+   *   参考站点也是这么做的（`!reducedMotion && ...`）。
+   */
+  setReducedMotion(reduced: boolean): void {
+    if (this.reducedMotion === reduced) return;
+    this.reducedMotion = reduced;
+    this.pointer.syncConfig(resolvePointer(this.pointerConfig, reduced));
+    this.stats.pointerActive = this.pointer.enabled;
   }
 
   /**

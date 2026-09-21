@@ -209,7 +209,21 @@ export function CanvasHost({ pack, content, audio }: CanvasHostProps) {
           //   注意它和上面的 post 是两件事：post 是"加什么滤镜"，
           //   medium 是"画面是什么材料做的"。详见 schema/medium.ts。
           medium: pack.site.medium,
+          // ★ 指针视差（PHASE 26）。不声明 → 相机一个像素都不动。
+          //   引擎不自己读 matchMedia —— reducedMotion 由下面的监听器告知。
+          pointer: pack.site.pointer,
         });
+
+        // ★ 把系统的 prefers-reduced-motion 告诉引擎（PHASE 26）。
+        //
+        //   引擎层刻意不碰 window（保持可在无 DOM 环境测试），
+        //   所以"观测"这件事落在装配层。这里同时处理初次取值和后续变化 ——
+        //   用户可以在页面开着的时候去系统设置里改，必须跟着响应。
+        const rmQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+        composer.setReducedMotion(rmQuery.matches);
+        const onReducedMotion = (e: MediaQueryListEvent) => composer?.setReducedMotion(e.matches);
+        rmQuery.addEventListener('change', onReducedMotion);
+        cleanupFns.push(() => rmQuery.removeEventListener('change', onReducedMotion));
         composer.setSize(w, h, dpr);
 
         // 先量章节高度，再启动滚动 —— 顺序反了的话第一帧进度会算错

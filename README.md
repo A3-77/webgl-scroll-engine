@@ -19,6 +19,27 @@
 *（同一场景，只改 `site.medium` 一个配置块 —— 网点 / 墨线 / 纸纹 / 抖动 / 持续颗粒。
 详见 [`docs/PHASE-25-媒介层.md`](docs/PHASE-25-媒介层.md)）*
 
+### 镜头会「看」，不是平移一张图
+
+自动构图给每一章分配一个**命名过的运镜**（`hold` / `dolly` / `orbit` / `whip` / `crash` / `rise`），
+并且相机真的有 `target` —— 位置与目标**各自独立阻尼**，`roll` 绕视线轴叠加。
+
+| 运镜 | 位置行程 (x/y/z) | 视线摆动 | 做什么 |
+|---|---|---|---|
+| `dolly` | 0 / 0 / 6.0 | 0.2° | 直推近，主体不动、背景向外散开 |
+| `orbit` | 11.9 / 0 / 0.3 | **18.0°** | 绕主体转 18° 弧，构图稳定、背景流动 |
+| `whip` | 3.7 / 0 / 0 | 6.6° | 甩镜头，**目标跟着扫** ⇒ 转场感 |
+| `crash` | 0 / 0 / 6.0 | 0.2° | `easeOutCubic` 冲进去 + fov 收窄 28°→32° |
+| `rise` | 0 / 2.7 / 1.8 | 7.7° | 抬升 + 视线下压（俯角） |
+| `hold` | 0.2 / 0.2 / 2.1 | 0.7° | 定住呼吸，**出去再回来** |
+
+*（浏览器实测，真实引擎路径。`npm run dev` → `?accept=1` 里的 ⑰ 项会现场打出这张表）*
+
+**为什么这一项是分水岭**：改造前相机只有 `position` + `rotation.z`，永远朝 −Z 看 ——
+能做的只有"把画面平移一段距离"，加多少缓动/阻尼/视差都救不回来。
+真实摄影机的运动是**围绕被摄体运动**。
+详见 [`docs/PHASE-26-镜头语言.md`](docs/PHASE-26-镜头语言.md)。
+
 ---
 
 ## 30 秒上手
@@ -89,7 +110,7 @@ input/                     ← 你的原始图片。按文件名排序 = 章节�
 scripts/build-assets/      ← 素材流水线（Python）
   pipeline/
     providers/             ← 分割算法，可插拔
-    selftest.py            ← 18 项算子自检（npm run build-assets:selftest）
+    selftest.py            ← 20 项算子自检（npm run build-assets:selftest）
 src/
   asset-pipeline/          ← manifest → SceneConfig 的自动构图
   schema/                  ← 引擎与内容之间的契约层
@@ -115,7 +136,7 @@ docs/                      ← 技术文档
 | `npm run build-assets:selftest` | 算子自检（20 项，改过 `imaging.py` 之后跑一遍） |
 | `npm run build-assets:providers` | 列出可用的分割算法 |
 | `npm run verify:independence` | 验证「删除内容包后引擎仍可运行」（自动移出→构建→检查→恢复） |
-| `npm test` | 单元测试（97 个用例 / 3 个纯函数模块，~0.6s） |
+| `npm test` | 单元测试（**265** 个用例 / 13 个文件，~1.3s） |
 | `npm run typecheck` | 类型检查。**改完 shader 必跑** |
 
 切换内容包：URL 加 `?content=<包名>`。可用 `cats`（素材驱动）和 `placeholder`（引擎自检，不依赖素材）。
@@ -127,7 +148,7 @@ docs/                      ← 技术文档
 把整条链路跑一遍断言，而不是靠肉眼：
 
 ```
-http://localhost:5199/?accept=1        ← 打开就跑，结果打到 console
+http://localhost:5173/?accept=1        ← 打开就跑，结果打到 console
 ```
 
 或在控制台里随时：
@@ -136,9 +157,17 @@ http://localhost:5199/?accept=1        ← 打开就跑，结果打到 console
 await __ACCEPTANCE__.run()
 ```
 
-覆盖路线图的 ②③④⑤⑥⑦⑧ 六条标准（①⑨ 需要构建期动作，会标成 `SKIP` 并说明该怎么做）。
+覆盖路线图的 ②③④⑤⑥⑦⑧ 六条标准，外加 ⑩~⑰ **引擎能力覆盖**
+（遍历当前内容包**实际声明的**能力逐项跑一遍，没声明的报 `SKIP` 并说明"这项没被覆盖"）。
+①⑨ 需要构建期动作，会标成 `SKIP` 并说明该怎么做。
+
+其中 **⑰ 运行时替换运镜** 值得单独提一句 —— 它走的是和 `Composer.refreshLayout`
+（改窗口大小触发重新构图）完全同一条真实路径，并且会现场打出上面那张六个运镜的位姿表。
+
 **要全覆盖就跑两个包**：`?content=placeholder`（覆盖全部引擎能力）和 `?content=cats`（覆盖素材驱动）各跑一次 ——
 两个包的 SKIP 是互补的。
+
+当前状态（cats 包 / Chrome）：**9 PASS / 0 FAIL / 8 SKIP，143.9 fps**。
 
 构建期的两项：
 
@@ -185,6 +214,8 @@ npm run build-assets -- --provider rembg
 | `bgDist` | 40 | 背景到相机的距离 |
 | `maxSubjectH` | 0.92 | 主体初始占屏高度上限（超宽视口下防止主体出界） |
 | `maxScreenH` | 1.05 | 相机推进结束时主体允许占的高度 |
+| `lookBlend` | 0.45 | **镜头"看多准"**：`look = 轴线 + lookBlend × (主体 − 轴线)`。0 = 不看主体，1 = 死盯主体（背景板会被推出去，实测 overscan 需求 1.52 超预算） |
+| `bgOverscanMax` | 1.45 | 背景放大的**预算上限**。运镜需求超了就自动压 `intensity`（见 [`docs/PHASE-26-镜头语言.md`](docs/PHASE-26-镜头语言.md) §8） |
 
 内容包可以在自己的 `build()` 里覆盖任意一项：
 
@@ -194,6 +225,37 @@ build: async ({ aspect }) => {
   return composeContent(manifest, { aspect, dolly: -9, dist: [16, 40] });
 };
 ```
+
+### 镜头语言：`camera.move` + `site.pointer`
+
+**这是"运动"的一半**，和媒介层（材质）完全独立。详见 [`docs/PHASE-26-镜头语言.md`](docs/PHASE-26-镜头语言.md)。
+
+自动构图会按 `MOVE_CYCLE = ['dolly', 'orbit', 'rise', 'hold', 'crash', 'whip']`
+给每章分配一个运镜（顺序刻意排过 —— 只有 2 章也能拿到表现力最强的两个）。
+内容包想自己指定就写 `camera.move`：
+
+| 字段 | 作用 |
+|---|---|
+| `kind` | `hold` / `dolly` / `orbit` / `whip` / `crash` / `rise` |
+| `subject` | **绕谁转**（orbit 的弧心，也是 fov 收窄的参考深度） |
+| `look` | **看向哪**。★ 和 `subject` 分开 —— 前者是取景，后者是运动中心 |
+| `intensity` | `0` = 退化成静止（但**依然 `lookAt`**，构图不塌） |
+| `approach` | 最大推近量（世界单位）。**由构图给，运镜不自由发挥** |
+| `dir` | `1 / -1`，相邻章交替镜像 |
+
+不想用 `move` 也可以手写 `target.x/y/z` 轨道（`cameraHasTarget()` 靠轨道判定）。
+
+**指针视差**（第三个连续驱动源，见 `site.pointer`）默认关：
+
+```ts
+import { POINTER_PARALLAX } from '../schema';
+
+site: { pointer: POINTER_PARALLAX }   // 0.035 幅度 / axis [0.35, 0.25] / damping 0.12
+```
+
+幅度按**相机到目标的距离**缩放 ⇒ 观感是恒定的 ±2° 角度偏移，推近拉远手感一致。
+★ 有**两道门控**（照搬参考站点）：只在 `hold` / `dolly` 这类**已定型**的镜头里生效，
+且过场中一律关掉 —— 镜头自己在飞的时候再叠指针位移会让画面"发毛"。
 
 ### 媒介层：`site.medium`
 
@@ -248,6 +310,8 @@ build: async ({ aspect }) => {
 - **竖屏下横排主体会出界。** 源图是横排的 5 只猫（1.5），竖屏（0.67）时横向放大 2.26 倍，只能看到中间 3 只。这是 `cover` 语义的几何必然（背景必须铺满，主体才能"长在原处"）—— 换一张更接近方形的源图最省事。详见 [`docs/PHASE-17-响应式.md`](docs/PHASE-17-响应式.md)。
 - **背景补洞会留下块状痕迹。** 抠掉主体后背景要补洞，补洞算法工作在 64px 的块上，于是背景里能看到 64px 尺度的方块。这是**素材流水线的既有缺陷**（PHASE 25 排查时确认与媒介层无关：把媒介层全部旋钮归零，方块依然在）。有趣的是媒介层的网点/纸纹会把它盖住。详见 [`docs/PHASE-25-媒介层.md`](docs/PHASE-25-媒介层.md) §7.2。
 - **`position.x` 的位移单位与文档不一致。** 文档与构图都写着"世界位移 = 值 × 视口高 × aspect"，实际生效的是"1.0 = 一个视口高"，横向幅度只有设计值的 `1/aspect`（2.1 视口下约 47%）。这是拆分前 `SceneBuilder.applyTime` 的遗留问题，**PHASE 4~9 拆分时有意未改**（修它会改变所有现有内容的观感）。一行修复位置：`src/engine/SceneBuilder.ts` 的 `setAspect()` 里补 `objectSystem.setAspect(next)`；修完横向幅度变成 aspect 倍，需要重新过眼睛。
+- **相机阻尼没有"段边界"。** 参考站点的阻尼是**分段**的（段内 lerp、**段间硬切**）；本引擎的 `damping` 是全局一阶低通。如果内容作者在某条轨道里写了一个硬跳（等价于一个 cut），阻尼会把它糊成一段滑动。**跨场景不受影响**（每个场景有独立的 `CameraSystem` 实例，首帧天然硬切）。要修的话给 keyframe 加 `snap?: boolean`，位置在 `src/engine/systems/CameraSystem.ts` 的 `apply()`。详见 [`docs/PHASE-26-镜头语言.md`](docs/PHASE-26-镜头语言.md) §12.1。
+- **`lookBlend` 是全局常量**，不能按章节调。某章如果特别依赖主体居中，现在只能手写 `camera.target` 覆写。
 - **媒介层的"印品感"上限由素材决定，不由引擎决定。** 分级只能把素材的色调范围拉开，拉不出素材里没有的东西。实测 cats 素材（高调浅色油画）的亮度标准差只有 0.132，扫了 20 组分级参数，输出标准差上限约 0.215；而参考站点的版画是 0.263~0.344 —— 因为它们的场景里有**大块平涂的实黑色块**。所以：**高调照片印出来就是高调**。想要那种海报感要换素材，或拧 `dither`（见上文）。详见 [`docs/PHASE-25-媒介层.md`](docs/PHASE-25-媒介层.md) §7.8。
 
 ---
@@ -255,6 +319,7 @@ build: async ({ aspect }) => {
 ## 文档
 
 - [`docs/内容包契约.md`](docs/内容包契约.md) —— **怎么写自己的内容包**（两种形态、场景契约、容易踩的点）
+- [`docs/PHASE-26-镜头语言.md`](docs/PHASE-26-镜头语言.md) —— **镜头语言**（六个命名运镜、相机 `target`、三条实现纪律、`look` vs `subject` 的推导、指针门控）：让镜头**会看**，而不是平移一张图
 - [`docs/PHASE-25-媒介层.md`](docs/PHASE-25-媒介层.md) —— **媒介层**（网点/墨线/纸纹/抖动/持续颗粒）：把画面**重绘成另一种材料**，而不是加滤镜；含两个参考站的差距分析与实测数据
 - [`docs/PHASE-24-火山引擎分割.md`](docs/PHASE-24-火山引擎分割.md) —— 用 EntitySegment 做实例分割（挨着的主体也能拆开），含鉴权排查全过程
 - [`docs/PHASE-23-3D过渡载体.md`](docs/PHASE-23-3D过渡载体.md) —— 载体飞过 + 溶解跟随 + 有机边缘；**以及顺带挖出的 PHASE 18 后处理语义缺陷**

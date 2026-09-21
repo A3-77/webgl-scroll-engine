@@ -79,6 +79,7 @@
 import type {
   AssetRegistry,
   CameraConfig,
+  CameraMoveKind,
   ContentManifest,
   SceneConfig,
   SceneManifest,
@@ -86,6 +87,8 @@ import type {
   SubjectManifest,
   Track,
 } from '../schema';
+import { cameraHasTarget, cameraTracksOf } from '../schema';
+import { evaluateTracks } from '../animation/timeline';
 import { expandPreset } from '../animation/presets';
 
 /* ------------------------------------------------------------ 选项 */
@@ -149,6 +152,47 @@ export interface ComposeOptions {
    */
   maxSubjectH?: number;
 
+  /**
+   * 背景平面允许的**最大 overscan**（PHASE 26）。
+   *
+   * 为什么需要这个预算：相机一旦真的开始"绕主体转 / 甩镜头"，可见区域
+   * 会横向大幅平移，背景平面必须比视口更大才不露边 —— 而 overscan 是
+   * **等比放大**，放得越大背景越糊。
+   *
+   * 所以构图的做法是：先按满幅度算一次，量出需要多大的 overscan；
+   * 超预算就把**运镜幅度**压回来，而不是无限放大背景。
+   * 见 `overscanForCamera` 与 `composeCamera`。
+   *
+   * 1.45 的含义：背景最多被放大 45%。对一张 2048 宽的源图来说，
+   * 在 1920 视口上仍然够清晰。
+   */
+  bgOverscanMax?: number;
+
+  /**
+   * ★ 相机"看向主体"的程度（PHASE 26）：`look = 轴线 + lookBlend × (主体 − 轴线)`。
+   *
+   *   `1.0` = 死盯主体，主体永远在画面正中央。
+   *   `0.0` = 完全不转，构图和原照片一模一样 —— 但相机也就不会"看"了，
+   *           `orbit` / `whip` 会退化成"平移一张图"。
+   *   `0.45` = 默认。主体留在三分线附近。
+   *
+   * ---------------------------------------------------------------------------
+   * 【为什么默认不是 1.0】
+   *
+   *   两个理由，一个美学、一个几何：
+   *
+   *   ① 美学：把主体摆到正中央会丢掉原照片的取景。主体偏一点反而更好看。
+   *
+   *   ② 几何（更硬的理由）：相机一转头，**平坦的背景板**就得跟着变大
+   *      才不露边，而且这个需求和运镜幅度**无关** ——
+   *      实测 cats 内容在 aspect 2.234 下，主体偏轴 8° 时
+   *      静态构图就需要 overscan **1.52**，超出 1.45 的预算。
+   *      预算回路只能把 intensity 压到 0（画面一动不动），背景照样不够大。
+   *
+   *      lookBlend = 0.45 → 需求 1.52 降到 1.19，运镜才真的有幅度可用。
+   */
+  lookBlend?: number;
+
   /** 每个场景的 DOM 文案覆盖 */
   copy?: Record<string, { eyebrow?: string; title?: string; body?: string }>;
 }
@@ -157,13 +201,16 @@ const DEFAULTS = {
   heightVh: 2.0,
   cameraZ: 6,
   fov: 32,
-  // ★ 负值 = 前进。见文件头"相机的朝向"
+  // ★ 负值 = 前进。见文件头"相机的朝向"。
+  //   它同时是**推近预算** —— 运镜能推多近由它决定（见 CameraMoveSpec.approach）
   dolly: -6,
   camY: 1.2,
   dist: [20, 34] as [number, number],
   bgDist: 40,
   maxScreenH: 1.05,
   maxSubjectH: 0.92,
+  bgOverscanMax: 1.45,
+  lookBlend: 0.45,
 } as const;
 
 /* ------------------------------------------------------------ 小工具 */
@@ -191,6 +238,36 @@ function visibleHAt(dist: number, fovDeg: number): number {
  *   变成无法复现的玄学。
  */
 const MOTION_CYCLE = ['float', 'sway', 'orbit', 'drift', 'float'] as const;
+
+/**
+ * ★ 相机运镜分配（PHASE 26）。
+ *
+ * 改造前每章都是同一套动作（`position.z` 推进 + `position.y` 上下平移
+ * + 微滚转），只把方向符号交替 —— `composeCamera` 自己的注释就承认了
+ * "每章都用同一套运镜会让人明显感到'又是这个动作'"。
+ *
+ * 现在按顺序给每章一种**不同的镜头语言**，让翻页读起来像"剪辑"：
+ *
+ *   0 dolly  推近 —— 从"看全景"进入"看这个"。经典的开场镜头。
+ *   1 orbit  绕行 —— 分层纵深最出效果的一种。**放在第 2 位是刻意的**：
+ *            只有两章的内容（最小可用素材集）也能拿到"推进 + 绕行"这对
+ *            表现力最强的组合，而不是"推进 + 又一个推进"。
+ *   2 rise   升起俯视 —— 视角一换，观众会重新读一遍画面。
+ *   3 hold   不动 —— 情绪落下来的一拍，让观众自己看。**必须排在后面**：
+ *            它是"减法"，前面得有东西可减。
+ *   4 crash  冲向主体 —— 情绪最重的一章给它。
+ *   5 whip   甩镜头 —— 收尾时把镜头甩出去，接下一轮。
+ *
+ * 固定序列、不随机：同样的素材每次构建结果一致（同 MOTION_CYCLE 的理由）。
+ */
+const MOVE_CYCLE: readonly CameraMoveKind[] = [
+  'dolly',
+  'orbit',
+  'rise',
+  'hold',
+  'crash',
+  'whip',
+];
 
 /**
  * 黄金比序列 —— 用确定性方式把 N 个主体散布在深度区间上。
@@ -358,26 +435,177 @@ interface SubjectContext {
   bgDist: number;
   maxScreenH: number;
   maxSubjectH: number;
+  /**
+   * ★ 主体的**世界坐标质心**（PHASE 26）—— 运镜的"看向哪"。
+   *
+   * 为什么必须是真的世界坐标而不是原点：`orbit` 是**绕主体转**，
+   * 如果看向原点而主体在别处，绕行就变成了"绕着空气转" ——
+   * 主体会在画面里画圈，正是要避免的那种"平移感"。
+   *
+   * 由 `subjectCentroid` 从已经摆好的主体对象反推（offset + z → 世界坐标），
+   * 所以不存在"两套摆放数学"对不上的风险。
+   */
+  subjectWorld: [number, number, number];
+  /**
+   * ★ 相机**看向哪**（PHASE 26）—— 轴线与主体之间的折中点。
+   * 见 ComposeOptions.lookBlend 的推导。
+   */
+  cameraLook: [number, number, number];
+  /** 背景 overscan 的预算上限，见 ComposeOptions.bgOverscanMax */
+  bgOverscanMax: number;
 }
 
 /* ------------------------------------------------------------ 背景 → 对象 */
 
+/**
+ * 屏幕四角（NDC）。
+ * 背景要"不露边"，等价于这四角射线打在背景平面上的落点都落在平面内。
+ */
+const CORNERS: ReadonlyArray<readonly [number, number]> = [
+  [-1, -1],
+  [1, -1],
+  [-1, 1],
+  [1, 1],
+];
+
+/**
+ * ★ 数值扫描整段运镜，算出背景平面**至少**需要多大的 overscan 才不露边。
+ *
+ * ---------------------------------------------------------------------------
+ * 【为什么不再用闭式公式】
+ *
+ *   改造前的公式是 `1 + 2|camY| / visibleH + 0.03`，推导干净，但它只覆盖
+ *   **相机沿 y 平移**这一种情况（因为那时相机只会平移）。
+ *
+ *   PHASE 26 之后相机有了 `target`，会**转动**：`orbit` 绕着主体转、
+ *   `whip` 把视线甩出去。转动对"背景露不露边"的影响比平移大得多 ——
+ *   相机绕着主体转 9°，背景平面（在主体后面 13 个单位）会被推出
+ *   `k·tan9° ≈ 2.1` 个世界单位，而纯平移只会推出 `d·sin9°`。
+ *   手推这个闭式公式要分运镜种类、分轴、还要处理 lookAt 的基向量，
+ *   改一个运镜就得重推一遍 —— 很容易推错，而且错了只表现为"边缘露出一条"。
+ *
+ *   所以改成**直接量**：按 t 采样相机位姿（位置 + 朝向），把屏幕四角
+ *   反投影到背景平面上，取最大超出量。任何新运镜都自动正确。
+ *
+ * ---------------------------------------------------------------------------
+ * 【它同时管"lookAt 的基向量"和"roll"】
+ *
+ *   朝向按 three 的 `lookAt` 规则构造：相机 −z 指向目标，
+ *   `x = normalize(up × z)`、`y = z × x`（up = 世界 +y）。
+ *   相机空间里的角点方向是 `(nx·tanHalf·aspect, ny·tanHalf, −1)`；
+ *   `CameraSystem` 在 lookAt 之后还会 `rotateZ(roll)`，所以在相机空间里
+ *   把 (dx, dy) 反向转 −roll 即可（roll ≤ 0.03 rad，但它对角落的影响
+ *   约等于 `roll × halfW/halfH` ≈ 6%，不能忽略）。
+ */
+export function overscanForCamera(
+  camera: CameraConfig,
+  bgZ: number,
+  aspect: number,
+  samples = 32,
+): number {
+  const tracks = cameraTracksOf(camera);
+  const hasTarget = cameraHasTarget(camera);
+  const tanHalf = Math.tan((camera.fov * Math.PI) / 180 / 2);
+  // overscan = 1 时，cover 平面正好铺满视口 → 半宽半高就是视口的半宽半高
+  const halfH = visibleHAt(Math.abs(camera.z - bgZ), camera.fov) / 2;
+  const halfW = halfH * aspect;
+
+  const out: Record<string, number> = {};
+  let need = 1;
+
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples;
+    evaluateTracks(tracks, t, out);
+
+    const cx = out['position.x'] ?? 0;
+    const cy = out['position.y'] ?? 0;
+    const cz = out['position.z'] ?? camera.z;
+
+    // 相机基向量（three 的 lookAt 让 −z 指向目标 ⇒ z 轴 = 相机 − 目标）
+    let zx: number;
+    let zy: number;
+    let zz: number;
+    if (hasTarget) {
+      zx = cx - (out['target.x'] ?? camera.target?.[0] ?? 0);
+      zy = cy - (out['target.y'] ?? camera.target?.[1] ?? 0);
+      zz = cz - (out['target.z'] ?? camera.target?.[2] ?? 0);
+    } else {
+      // 不声明 target = 永远朝 −z 看（原分支）
+      zx = 0;
+      zy = 0;
+      zz = 1;
+    }
+    const zl = Math.hypot(zx, zy, zz) || 1;
+    zx /= zl;
+    zy /= zl;
+    zz /= zl;
+
+    // x = normalize(up × z)，up = (0,1,0) ⇒ (zz, 0, −zx)
+    let xx = zz;
+    let xz = -zx;
+    const xl = Math.hypot(xx, xz);
+    if (xl < 1e-6) {
+      // 相机几乎垂直朝上/下看 —— 退化取一个任意正交基
+      xx = 1;
+      xz = 0;
+    } else {
+      xx /= xl;
+      xz /= xl;
+    }
+    // y = z × x
+    const yx = zy * xz - zz * 0;
+    const yy = zz * xx - zx * xz;
+    const yz = zx * 0 - zy * xx;
+
+    const roll = out['rotation.z'] ?? 0;
+    const cr = Math.cos(roll);
+    const sr = Math.sin(roll);
+
+    for (const [nx, ny] of CORNERS) {
+      let dx = nx * tanHalf * aspect;
+      let dy = ny * tanHalf;
+      // rotateZ(roll) 之后，相机空间里角的坐标反向转了 −roll
+      const rx = dx * cr - dy * sr;
+      const ry = dx * sr + dy * cr;
+      dx = rx;
+      dy = ry;
+      const dz = -1;
+
+      const wx = xx * dx + yx * dy + zx * dz;
+      const wy = 0 * dx + yy * dy + zy * dz;
+      const wz = xz * dx + yz * dy + zz * dz;
+
+      if (Math.abs(wz) < 1e-9) continue;
+      const s = (bgZ - cz) / wz;
+      // s ≤ 0 = 这条射线朝背离背景平面的方向走，不可能露边
+      if (s <= 0) continue;
+
+      const px = cx + s * wx;
+      const py = cy + s * wy;
+      need = Math.max(need, Math.abs(px) / halfW, Math.abs(py) / halfH);
+    }
+  }
+
+  return need;
+}
+
 function composeBackground(
   scene: SceneManifest,
   ctx: SubjectContext,
+  camera: CameraConfig,
 ): SceneObjectConfig {
-  const { cameraZ, fov, camY, bgDist } = ctx;
+  const { cameraZ, fov, bgDist, aspect } = ctx;
   const z = cameraZ - bgDist;
 
-  // ★ overscan 必须覆盖相机的横向摆动，否则背景边缘会露出来。
-  //   条件：背景半高 ≥ 视口半高 + |camY|
-  //         visibleH·os/2 ≥ visibleH/2 + |camY|
-  //     ⇒   os ≥ 1 + 2|camY| / visibleH
-  //   再留 3% 余量给浮点误差和"相机 y 与 z 同时变化"的耦合项。
+  // ★ 背景必须覆盖**整段运镜**里相机能看到的所有方向，否则边缘会露出来。
   //
-  //   只按**初始距离**算就够了：相机推进后距离变小、背景相对视口更大，
-  //   余量只会更宽（推进 6 个单位，余量从 os−1 涨到 os·1.18−1）。
-  const overscan = 1 + (2 * Math.abs(camY)) / visibleHAt(bgDist, fov) + 0.03;
+  //   改造前这里是一个手推的闭式公式（`1 + 2|camY|/visibleH + 0.03`），
+  //   只覆盖"相机沿 y 平移"。相机现在会转（orbit / whip），闭式公式不再成立
+  //   —— 改成数值扫描实际位姿，见 overscanForCamera 的说明。
+  //
+  //   扫描采样 32 个 t，可能擦过极值点，所以再放 3% 余量。
+  const need = overscanForCamera(camera, z, aspect);
+  const overscan = need * 1.03;
 
   return {
     id: 'bg',
@@ -403,45 +631,72 @@ function composeBackground(
 
 /* ------------------------------------------------------------ 相机 */
 
-function composeCamera(
-  index: number,
-  opts: SubjectContext,
-): CameraConfig {
-  const { cameraZ, fov, dolly, camY } = opts;
-  // 相邻章节方向交替（0/2/4 一组，1/3/5 一组）——
-  // 每章都用同一套运镜会让人明显感到"又是这个动作"。
-  const dir = index % 2 === 0 ? 1 : -1;
+/**
+ * ★ 相机 —— 现在只负责**声明一个运镜**（PHASE 26）。
+ *
+ * 轨道由 `animation/camera-moves.ts` 展开（`cameraTracksOf` 是展开点），
+ * 所以这里不再手写 `position.z` / `position.y` / `rotation.z` 三条轨道。
+ *
+ * ---------------------------------------------------------------------------
+ * 【预算回路：超预算时压幅度，而不是放大背景】
+ *
+ *   运镜幅度越大，背景平面就得越大才不露边；而 overscan 是等比放大，
+ *   放得越大背景越糊。所以这里先按满幅度建一次相机、量出需要的 overscan，
+ *   超预算就把 `intensity` 压回来。
+ *
+ *   横向幅度与 intensity 近似线性，所以一步就能修正到位；`orbit` 用的是
+ *   角度（sin），略非线性，所以再量一次兜住。
+ */
+function composeCamera(index: number, ctx: SubjectContext): CameraConfig {
+  const { cameraZ, fov, dolly, bgDist, subjectWorld, cameraLook, bgOverscanMax, aspect } = ctx;
 
-  const tracks: Track[] = [
-    {
-      // ★ 推进：z 变小 = 离物体更近。dolly 是负值，见文件头"相机的朝向"
-      path: 'position.z',
-      keyframes: [
-        { t: 0, value: cameraZ, ease: 'easeInOut' },
-        { t: 1, value: cameraZ + dolly, ease: 'easeInOut' },
-      ],
-    },
-    {
-      // 上下平移 —— 这是**横向视差**的来源：
-      // 相机在 y 上移动 Y，屏幕位移 ∝ Y / 距离，
-      // 所以近处的主体比背景移动得多，层次感是几何给的。
-      path: 'position.y',
-      keyframes: [
-        { t: 0, value: -camY * dir, ease: 'easeInOut' },
-        { t: 1, value: camY * dir, ease: 'easeInOut' },
-      ],
-    },
-    {
-      // 极轻微的滚转 —— 超过 0.02 弧度就会让人觉得"画面歪了"
-      path: 'rotation.z',
-      keyframes: [
-        { t: 0, value: 0.012 * dir, ease: 'easeInOut' },
-        { t: 1, value: -0.012 * dir, ease: 'easeInOut' },
-      ],
-    },
-  ];
+  // 相邻章节方向交替 —— 同一个运镜在相邻章读起来不同
+  // （参考站点就是靠这个让 dolly 一会儿推近一会儿拉远的）
+  const dir: 1 | -1 = index % 2 === 0 ? 1 : -1;
+  const kind = MOVE_CYCLE[index % MOVE_CYCLE.length];
+  const bgZ = cameraZ - bgDist;
 
-  return { z: cameraZ, fov, tracks };
+  const build = (intensity: number): CameraConfig => ({
+    z: cameraZ,
+    fov,
+    // 轨道全部由 move 展开 —— 不再手写
+    tracks: [],
+    // target 是"没有 target.* 轨道时的兜底"，取值和运镜的 look 一致
+    target: cameraLook,
+    move: {
+      kind,
+      // 绕谁转 = 主体（orbit 要真的绕着它）
+      subject: subjectWorld,
+      // 看向哪 = 折中点，不是主体本身。见 ComposeOptions.lookBlend
+      look: cameraLook,
+      intensity,
+      dir,
+      // ★ 推近预算 = 内容声明的 |dolly|。
+      //   构图反解主体深度时用的就是这个数（`screenH × d/(d+dolly) ≤ maxScreenH`），
+      //   所以运镜推近量必须和它一致，否则主体会被顶出画面。
+      approach: Math.abs(dolly),
+    },
+  });
+
+  let camera = build(1);
+  let need = overscanForCamera(camera, bgZ, aspect);
+
+  // 迭代到收敛。★ 每步乘 0.98 是**阻尼**：
+  //   `need` 是 32 个采样点上的最大值，intensity 一变，极值点会挪到
+  //   另一个采样点上，于是"量出来的最大值"不是强度的光滑函数 ——
+  //   不阻尼的话会在预算上下反复横跳，收敛不到。
+  //
+  //   ★ 注意：如果**静态构图**（intensity = 0）本身就超预算，这个回路
+  //     救不回来 —— 它会把 intensity 压到 0 然后放弃，画面一动不动。
+  //     那是 `lookBlend` 该解决的问题，不是幅度的问题。
+  for (let attempt = 0; attempt < 5 && need > bgOverscanMax; attempt++) {
+    const scale = (bgOverscanMax - 1) / Math.max(need - 1, 1e-6);
+    const current = camera.move?.intensity ?? 1;
+    camera = build(Math.max(current * scale * 0.98, 0));
+    need = overscanForCamera(camera, bgZ, aspect);
+  }
+
+  return camera;
 }
 
 /* ------------------------------------------------------------ 场景 */
@@ -460,6 +715,65 @@ export function subjectAssetKey(sceneId: string, subjectId: string): string {
 }
 
 /**
+ * ★ 主体的世界坐标质心（PHASE 26）—— 运镜"看向哪"。
+ *
+ * 从**已经摆好的主体对象**反推，而不是重算一遍构图数学：
+ *   offset 就是屏幕归一化坐标（见文件头性质一），乘上该深度处的视口尺寸
+ *   就是世界坐标 —— 和 `SceneBuilder` 的 baseX/baseY 是同一套换算。
+ *
+ * 这样做的价值：只有**一处**摆放数学。若在这里重写一遍，
+ * 以后改构图公式就很容易只改一处，运镜于是"看向空气"。
+ */
+function subjectCentroid(
+  objects: SceneObjectConfig[],
+  ctx: SubjectContext,
+): [number, number, number] {
+  let sx = 0;
+  let sy = 0;
+  let sz = 0;
+  let n = 0;
+
+  for (const o of objects) {
+    if (o.role !== 'subject') continue;
+    const vh = visibleHAt(Math.abs(ctx.cameraZ - o.z), ctx.fov);
+    sx += o.offset[0] * vh * ctx.aspect;
+    sy += o.offset[1] * vh;
+    sz += o.z;
+    n++;
+  }
+
+  // 没有主体（只有背景的场景）→ 看向深度区间的中点，绕行仍然成立
+  if (n === 0) {
+    const mid = (ctx.dist[0] + ctx.dist[1]) / 2;
+    return [0, 0, ctx.cameraZ - mid];
+  }
+  return [sx / n, sy / n, sz / n];
+}
+
+/**
+ * ★ 相机看向哪 —— 轴线与主体之间的折中点（PHASE 26）。
+ *
+ * 「轴线」= 相机初始朝向（−z）在主体那个深度上的落点，也就是世界坐标
+ * `[0, 0, subject.z]`。看向它 = 相机完全不转，构图和原照片一模一样。
+ *
+ * 折中：`look = 轴线 + k × (主体 − 轴线)`
+ *   k = 0（轴线）→ 不转，但运镜退化成"平移一张图"
+ *   k = 1（主体）→ 死盯主体，主体居中但背景板被推出去（见 lookBlend 的推导）
+ */
+function composeLook(
+  subjectWorld: [number, number, number],
+  blend: number,
+): [number, number, number] {
+  const k = Math.min(Math.max(blend, 0), 1);
+  const axis: [number, number, number] = [0, 0, subjectWorld[2]];
+  return [
+    axis[0] + (subjectWorld[0] - axis[0]) * k,
+    axis[1] + (subjectWorld[1] - axis[1]) * k,
+    axis[2],
+  ];
+}
+
+/**
  * 把 manifest 组装成引擎能直接吃的 { assets, scenes }。
  *
  * 纯函数：给定同样的 manifest + aspect，永远得到同样的结果。
@@ -473,7 +787,7 @@ export function composeContent(
   const assets: AssetRegistry = {};
   const scenes: SceneConfig[] = [];
 
-  const subjectCtx: SubjectContext = {
+  const baseCtx: Omit<SubjectContext, 'subjectWorld' | 'cameraLook'> = {
     aspect: o.aspect,
     cameraZ: o.cameraZ,
     fov: o.fov,
@@ -483,6 +797,14 @@ export function composeContent(
     bgDist: o.bgDist,
     maxScreenH: o.maxScreenH,
     maxSubjectH: o.maxSubjectH,
+    bgOverscanMax: o.bgOverscanMax,
+  };
+  // 主体对象先于相机建，之后才知道质心；这两个占位值只用于建主体
+  // （composeSubject 不读 subjectWorld / cameraLook）
+  const subjectCtx: SubjectContext = {
+    ...baseCtx,
+    subjectWorld: [0, 0, 0],
+    cameraLook: [0, 0, 0],
   };
 
   manifest.scenes.forEach((scene, index) => {
@@ -499,10 +821,23 @@ export function composeContent(
     // ---- 对象：背景在最底，主体按 manifest 顺序（已是面积降序）----
     // renderOrder 由数组下标决定，所以顺序就是覆盖顺序：
     // 背景 → 最大的主体 → … → 最小的主体
-    const objects: SceneObjectConfig[] = [
-      composeBackground(scene, subjectCtx),
-      ...scene.subjects.map((s, i) => composeSubject(scene, s, i, index, subjectCtx)),
-    ];
+    //
+    // ★ 顺序（PHASE 26）：主体 → 质心 → 相机 → 背景。
+    //   背景的 overscan 依赖相机的整段运镜，所以它必须**最后**建；
+    //   而相机看向哪依赖主体的实际位置，所以它必须在主体之后。
+    const subjectObjects = scene.subjects.map((s, i) =>
+      composeSubject(scene, s, i, index, subjectCtx),
+    );
+
+    const subjectWorld = subjectCentroid(subjectObjects, baseCtx as SubjectContext);
+    const sceneCtx: SubjectContext = {
+      ...baseCtx,
+      subjectWorld,
+      cameraLook: composeLook(subjectWorld, o.lookBlend),
+    };
+
+    const camera = composeCamera(index, sceneCtx);
+    const background = composeBackground(scene, sceneCtx, camera);
 
     scenes.push({
       id: scene.id,
@@ -525,8 +860,8 @@ export function composeContent(
         // 溶解圆心放在背景平面上 —— 它会经 uProjectionView 投影到屏幕空间
         fadeCenter: [0, 0, o.cameraZ - o.bgDist],
       },
-      camera: composeCamera(index, subjectCtx),
-      objects,
+      camera,
+      objects: [background, ...subjectObjects],
     });
   });
 

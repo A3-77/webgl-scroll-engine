@@ -21,3 +21,4 @@ export * from './post';
 export * from './audio';
 export * from './carrier';
 export * from './medium';
+export * from './pointer';

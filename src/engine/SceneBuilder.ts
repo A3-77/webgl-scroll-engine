@@ -10,6 +10,7 @@ import type { ModelAsset } from './loaders';
 import { CameraSystem } from './systems/CameraSystem';
 import { ObjectAnimationSystem } from './systems/ObjectAnimationSystem';
 import { resolveParallax } from './systems/ParallaxSystem';
+import { PointerSystem } from './systems/PointerSystem';
 
 /**
  * 按 config 构建一个可渲染的场景。
@@ -70,8 +71,23 @@ export interface BuiltScene {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   layers: BuiltLayer[];
-  /** 按归一化时间轴 0..1 更新相机与所有对象 */
+  /**
+   * 按归一化时间轴 0..1 更新相机与所有对象。
+   *
+   * ★ 指针视差（PHASE 26）不在这里推进 —— `PointerSystem` 由 Composer 持有、
+   *   每帧推进**一次**（它是全局输入，不是每场景一份状态），
+   *   这里只调 `offsetFor(distance)` 读它算出的偏移。
+   *   与 `MediumSystem` 注入给 `TransitionSystem` 是同一个模式。
+   */
   applyTime(t: number, dt?: number): void;
+  /**
+   * 告知「这一帧该场景是否已定型」（不在过场里）。
+   *
+   * ★ 由 Composer 每帧调用 —— 只有它知道过渡进行到哪了。
+   *   `applyTime` 的签名保持稳定（两个场景都以同一个方式被求值），
+   *   门控状态单独走这个方法，和 `applyCameraConfig` / `setAspect` 同一套模式。
+   */
+  setSettled(settled: boolean): void;
   /** 视口比例变化时重算几何与缩放 */
   setAspect(aspect: number): void;
   /** 重新构图后整体替换相机配置（会同步给 CameraSystem） */
@@ -208,12 +224,51 @@ export function buildScene(
   textures: Map<string, THREE.Texture>,
   models: Map<string, ModelAsset>,
   aspect: number,
+  pointerSystem: PointerSystem,
 ): BuiltScene {
   const scene = new THREE.Scene();
 
   const camera = new THREE.PerspectiveCamera(config.camera.fov, aspect, 0.1, 1000);
   camera.position.set(0, 0, config.camera.z);
   scene.add(camera);
+
+  /**
+   * ★ 这一帧该场景是否「已定型」—— 由 Composer 每帧告知（见 setSettled）。
+   *
+   * 默认 `true`：独立使用 buildScene 时（测试、离线烘焙）没有过渡概念，
+   * 按"已定型"处理才符合直觉。
+   */
+  let settled = true;
+
+  /**
+   * ★ 指针视差是否允许作用在这个镜头上。
+   *
+   * 参考站点（`portfolio/components/ShotDirector.tsx`）的原文规则：
+   *
+   *     // pointer parallax: only inside settled shots, never in gutters/beats
+   *     const parallaxOk = !reducedMotion && sample.transition === null &&
+   *       (sample.shotKind === "hold" || sample.shotKind === "dolly");
+   *
+   * 两个条件都照搬：
+   *   ▸ `shotKind` 是 settled 的镜头 —— 镜头自己在飞的时候
+   *     （orbit / whip / crash / rise）**不再叠**指针位移。
+   *     否则两股运动同向叠加，画面会"发毛"：镜头转 18° 的同时
+   *     指针再把它推 2°，观众读到的不是"有创意"而是"抖"。
+   *   ▸ `transition === null` —— 过场中同理（由 Composer 喂 settled）。
+   *
+   * ⚠️ 没有声明 `move` 的旧内容包：这里返回 `true`，
+   *    与 PHASE 26 之前的行为**逐位一致**（那时候没有任何镜头语言，
+   *    指针就是唯一的环境运动）。零行为变更契约的一部分。
+   *
+   * ★ 用**函数**而不是构建时算一次的常量：`applyCameraConfig` 会把整个
+   *   camera 配置换掉（换运镜种类），算一次的常量会立刻变成陈旧值 ——
+   *   这正是 PHASE 26 反复踩到的同一类 bug（缓存没跟着 config 走）。
+   *   两个属性读取的成本可以忽略。
+   */
+  function pointerShotOk(): boolean {
+    const kind = config.camera.move?.kind;
+    return kind === undefined || kind === 'hold' || kind === 'dolly';
+  }
 
   // 光照：PBR 模型需要，MeshBasicMaterial 的平面完全不受影响 —— 所以无条件加上是安全的
   scene.add(new THREE.AmbientLight(0xffffff, LIGHTS.ambient));
@@ -349,13 +404,46 @@ export function buildScene(
    * 这里只负责"按正确顺序调它们"—— 相机先于对象，
    * 这样对象写进的是本帧最终的相机状态下的场景图。
    *
+   * ★ 指针视差（PHASE 26）叠在**轨道之后**，顺序不能换：
+   *   ▸ 轨道是内容写的"镜头从哪儿走到哪儿"，必须先写定基准
+   *   ▸ 指针偏移是"这一刻你从哪儿看"，叠加在基准之上
+   *   反过来的话，偏移会被下一帧的轨道求值覆盖掉（等于没做），
+   *   或者被平滑缓存吃进去累积成漂移。
+   *
    * @param t  场景自身的时间轴 0..1
    * @param dt 距上一帧的秒数。仅当相机声明了 damping 时才会用到
    *           （damping 是对求值结果做一阶低通，需要真实的帧间隔）
    */
   function applyTime(t: number, dt = 0): void {
     cameraSystem.apply(t, dt);
+
+    // 指针视差：必须在 cameraSystem.apply 之后（见上面的顺序说明）。
+    // pointerSystem 是**共享**的，这里只读偏移，不推进它的状态。
+    //
+    // ★ 两道门控（settled + 镜头种类），理由见 pointerShotOk 的注释。
+    //   门控关掉时**一像素都不加** —— 不是"幅度调小"，是彻底不加，
+    //   否则镜头飞行途中仍然会多出一个恒定的小偏移。
+    if (pointerSystem.enabled && settled && pointerShotOk()) {
+      // ★ 用**相机到场景的实际距离**做基准，而不是固定世界位移 ——
+      //   这样镜头推近/拉远时观感是恒定的角度偏移（参考站点的 "~ ±2deg"）。
+      //   不乘距离的话，推近之后指针会把画面直接晃出屏幕。
+      const offset = pointerSystem.offsetFor(Math.abs(camera.position.z));
+      camera.position.x += offset.x;
+      camera.position.y += offset.y;
+    }
+
     objectSystem.apply(t);
+  }
+
+  /**
+   * 告知「这一帧该场景是否已定型」（不在过场里）。Composer 每帧调一次。
+   *
+   * 过场中两个场景同时在渲染，此时指针视差会把两个场景往**同一个方向**推 ——
+   * 溶解的边界上会出现一层错位。参考站点把这条写成
+   * `sample.transition === null`，含义相同。
+   */
+  function setSettled(next: boolean): void {
+    settled = next;
   }
 
   /**
@@ -417,7 +505,9 @@ export function buildScene(
     scene.clear();
   }
 
-  // 系统实例：相机与对象求值各归其位（PHASE 5 / PHASE 7）
+  // 系统实例：相机与对象求值各归其位（PHASE 5 / PHASE 7）。
+  // ★ pointerSystem 是**注入**进来的共享实例（PHASE 26），不在这里 new ——
+  //   指针是全局输入，全站只有一个平滑状态。
   const cameraSystem = new CameraSystem(camera, config.camera);
   const objectSystem = new ObjectAnimationSystem(layers);
   objectSystem.setAspect(aspect);
@@ -425,5 +515,15 @@ export function buildScene(
   // 先跑一次，保证首帧就是正确状态（否则会闪一帧未初始化的画面）
   applyTime(0);
 
-  return { config, scene, camera, layers, applyTime, setAspect, applyCameraConfig, dispose };
+  return {
+    config,
+    scene,
+    camera,
+    layers,
+    applyTime,
+    setSettled,
+    setAspect,
+    applyCameraConfig,
+    dispose,
+  };
 }
