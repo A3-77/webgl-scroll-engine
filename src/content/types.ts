@@ -21,6 +21,7 @@ import type {
   AssetRegistry,
   AudioConfig,
   CarrierConfig,
+  MediumConfig,
   PostConfig,
   SceneConfig,
 } from '../schema';
@@ -97,6 +98,25 @@ export interface SiteConfig {
    *   这个判断属于内容，不属于引擎。
    */
   carrier?: CarrierConfig;
+
+  /**
+   * ★ 媒介层（PHASE 25）—— 「这张画面是用什么材料做的」。
+   *
+   * 不声明 → 不跑任何一个 pass，深度纹理也不分配，画面与 PHASE 25 前逐位相同。
+   *
+   * 它和上面的 `post` 是**两个不同的问题**：
+   *   `post`   问「在照片上加什么」   → bloom / 色差 / 颗粒 / 暗角
+   *   `medium` 问「照片是什么做的」   → 网点 / 墨线 / 纸纹 / 抖动
+   *
+   * 八个 post 效果叠满，画面依然是一张照片；
+   * 而 medium 只要开了网点 + 墨线，它就不再是照片了 —— 是一张印刷品。
+   *
+   * 参考站点走的正是这条路（iamsaeed.dev 的 PrintEffect、
+   * shader.se 的 ASCII 背景），而且都不是"滤镜"。
+   *
+   * 想快速试：`medium: MEDIUM_PRINT`（`schema/medium.ts` 里的出厂预设）。
+   */
+  medium?: MediumConfig;
 
   /**
    * ★ 声音 —— 同样属于内容包的审美决策。

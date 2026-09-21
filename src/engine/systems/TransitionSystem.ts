@@ -48,6 +48,7 @@ import type { BuiltScene } from '../SceneBuilder';
 import { createFullscreenQuad, type FullscreenQuad } from '../fullscreenQuad';
 import { FULLSCREEN_VERTEX } from '../../shaders/fullscreen';
 import { TRANSITION_FRAGMENT } from '../../shaders/transition';
+import type { MediumSystem } from './MediumSystem';
 
 export interface TransitionTextures {
   noise?: THREE.Texture | null;
@@ -79,11 +80,39 @@ export interface TransitionInput {
     /** 有机边缘强度 */
     organic: number;
   } | null;
+  /**
+   * 滚动活跃度 0..1（PHASE 25）。
+   *
+   * 媒介层的 pulse 用它展开。★ 和 PostSystem 吃的是**同一个值** ——
+   * 所以"切章时网点变粗"和"切章时色差炸开"严格同步，
+   * 是同一件事的两面，不是两条各自跑着的轨道。
+   */
+  activity?: number;
 }
 
 export class TransitionSystem {
   private rtCurrent!: THREE.WebGLRenderTarget;
   private rtNext!: THREE.WebGLRenderTarget;
+  /**
+   * ★ 深度纹理（PHASE 25）。
+   *
+   * 它是媒介层能做墨线的前提。挂在场景的 RenderTarget 上 ——
+   * 这样渲染场景时深度**顺带**就写进去了，零额外 draw call。
+   *
+   * 为什么要在这里持有：深度只在"场景渲染"那一刻存在。
+   * 一旦两张画面混成一张，"这个像素离相机多远"就永久丢失了。
+   * 所以必须在混合**之前**把它交给媒介层用掉。
+   */
+  private depthCurrent: THREE.DepthTexture | null = null;
+  private depthNext: THREE.DepthTexture | null = null;
+  /**
+   * 媒介层（PHASE 25）。不传 = 一个 pass 都不跑，行为与改造前逐位相同。
+   *
+   * ★ 用依赖注入而不是 import 具体实现，和 transitionTextures 同一个理由：
+   *   过渡系统只负责"把场景变成纹理"，至于这张纹理要不要被重绘，
+   *   是编排器（Composer）决定的事。
+   */
+  private readonly medium: MediumSystem | null;
   private readonly quad: FullscreenQuad;
   private readonly quadCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   /** 复用，避免每帧 new Matrix4 */
@@ -91,7 +120,8 @@ export class TransitionSystem {
   /** setSize 之前 render 会被调到 —— 没有尺寸就什么都不画，别崩 */
   private ready = false;
 
-  constructor(transitionTextures?: TransitionTextures) {
+  constructor(transitionTextures?: TransitionTextures, medium?: MediumSystem) {
+    this.medium = medium ?? null;
     const material = new THREE.ShaderMaterial({
       vertexShader: FULLSCREEN_VERTEX,
       fragmentShader: TRANSITION_FRAGMENT,
@@ -129,6 +159,8 @@ export class TransitionSystem {
 
     this.rtCurrent?.dispose();
     this.rtNext?.dispose();
+    this.depthCurrent?.dispose();
+    this.depthNext?.dispose();
 
     // HalfFloat：给后续 bloom 留出 >1 的余量，高光叠加不会被 clamp 成死白
     const options: THREE.RenderTargetOptions = {
@@ -143,9 +175,26 @@ export class TransitionSystem {
     this.rtCurrent = new THREE.WebGLRenderTarget(w, h, options);
     this.rtNext = new THREE.WebGLRenderTarget(w, h, options);
 
+    // ★ 只有媒介层在跑时才挂深度纹理。
+    //   多挂一张 24 位深度纹理 = 每帧多写 w×h×4 字节的带宽，
+    //   而不用媒介层的内容包（shopify / placeholder）完全不需要它。
+    //   「不声明就没有开销」是引擎的硬约定。
+    if (this.medium?.active) {
+      this.depthCurrent = new THREE.DepthTexture(w, h);
+      this.depthNext = new THREE.DepthTexture(w, h);
+      this.rtCurrent.depthTexture = this.depthCurrent;
+      this.rtNext.depthTexture = this.depthNext;
+    } else {
+      this.depthCurrent = null;
+      this.depthNext = null;
+    }
+
     const u = this.quad.mesh.material.uniforms;
     (u.uResolution.value as THREE.Vector2).set(w, h);
     u.uAspect.value = aspect;
+
+    // 媒介层自己那两张重绘目标的尺寸
+    this.medium?.setSize(width, height, pixelRatio);
 
     this.ready = true;
   }
@@ -157,26 +206,57 @@ export class TransitionSystem {
     if (!this.ready) return;
 
     const { currentScene, nextScene } = input;
+    const medium = this.medium;
+    const activity = input.activity ?? 0;
 
     // ① current → rtCurrent
     gl.setRenderTarget(this.rtCurrent);
     gl.clear();
     gl.render(currentScene.scene, currentScene.camera);
 
+    // ①' 媒介重绘（PHASE 25）
+    //     ★ 必须在这里做，不能等到过渡之后 —— 深度只在这一刻有效。
+    //       两张画面一旦混合，"这个像素离相机多远"就永久丢失了。
+    let currentTexture: THREE.Texture = this.rtCurrent.texture;
+    if (medium?.active) {
+      currentTexture = medium.apply(
+        gl,
+        0,
+        currentTexture,
+        this.depthCurrent,
+        currentScene.camera as THREE.PerspectiveCamera,
+        input.timeSec,
+        activity,
+      );
+    }
+
     // ② next → rtNext
-    //    没有 next 时复用 rtCurrent 的纹理：这样即使过渡 shader 因噪声扰动
+    //    没有 next 时复用 current 的纹理：这样即使过渡 shader 因噪声扰动
     //    渗出一点 blendFactor，混合的也是同一张图，不会出现残影
-    let nextTexture: THREE.Texture = this.rtCurrent.texture;
+    //    ★ 复用的一定是**重绘之后**的那张，否则没有下一章时画面会突然
+    //      从"印刷品"跳回"照片"（章节末尾的瞬间闪烁，实测可见）
+    let nextTexture: THREE.Texture = currentTexture;
     if (nextScene) {
       gl.setRenderTarget(this.rtNext);
       gl.clear();
       gl.render(nextScene.scene, nextScene.camera);
       nextTexture = this.rtNext.texture;
+      if (medium?.active) {
+        nextTexture = medium.apply(
+          gl,
+          1,
+          nextTexture,
+          this.depthNext,
+          nextScene.camera as THREE.PerspectiveCamera,
+          input.timeSec,
+          activity,
+        );
+      }
     }
 
     // ③ 双纹理 → 过渡
     const u = this.quad.mesh.material.uniforms;
-    u.tCurrent.value = this.rtCurrent.texture;
+    u.tCurrent.value = currentTexture;
     u.tNext.value = nextTexture;
     u.uProgress.value = input.uProgress;
     u.uTime.value = input.timeSec;
@@ -221,6 +301,8 @@ export class TransitionSystem {
   dispose(): void {
     this.rtCurrent?.dispose();
     this.rtNext?.dispose();
+    this.depthCurrent?.dispose();
+    this.depthNext?.dispose();
     this.quad.dispose();
     this.ready = false;
   }

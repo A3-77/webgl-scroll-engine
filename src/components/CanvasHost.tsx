@@ -205,6 +205,10 @@ export function CanvasHost({ pack, content, audio }: CanvasHostProps) {
           // ★ 3D 过渡载体（PHASE 23）。同样是"内容包声明 → 装配层翻译 → 引擎执行"。
           //   不声明就是 undefined → 引擎内部按 enabled:false 处理，零开销。
           carrier: pack.site.carrier,
+          // ★ 媒介层（PHASE 25）。不声明 → 一个 pass 都不跑，深度纹理也不分配。
+          //   注意它和上面的 post 是两件事：post 是"加什么滤镜"，
+          //   medium 是"画面是什么材料做的"。详见 schema/medium.ts。
+          medium: pack.site.medium,
         });
         composer.setSize(w, h, dpr);
 

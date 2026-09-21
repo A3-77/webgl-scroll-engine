@@ -11,7 +11,7 @@
 import { DESIGN } from '../../config/design';
 import { DEFAULT_TRANSITION_TEXTURES } from '../engine-assets';
 // 依赖方向：content/ → schema/ ✓（契约层是唯一被两边共享的东西）
-import type { AudioConfig, CarrierConfig, PostConfig } from '../../schema';
+import type { AudioConfig, CarrierConfig, MediumConfig, PostConfig } from '../../schema';
 import type { SiteConfig } from '../types';
 
 /**
@@ -181,6 +181,52 @@ const CARRIER: CarrierConfig = {
   onlyDuringTransition: true,
 };
 
+/**
+ * ★ 媒介层（PHASE 25）—— 把画面印出来，而不是给它加滤镜。
+ *
+ * 【为什么 cats 包要用它】
+ *   这套素材是**油画**（笔触、颜料堆叠、明显的色块边界）。
+ *   油画 + 印刷网点 = "一张被印在纸上的油画"，
+ *   这个组合在视觉上是自洽的 —— 印刷本来就是油画的复制方式。
+ *
+ * 【几个旋钮为什么取这些值】
+ *   mono 0.45 —— 不用给到 1。完全灰度会把彩虹帽、蓝领带的色彩信息抹掉，
+ *     而素材驱动的引擎不该替用户决定"这张图该不该有颜色"。
+ *     0.45 保住了色调，同时让网点读起来像"印刷"而不是"噪点"。
+ *
+ *   halftoneScale 6 —— 落在"看得见网点结构"的区间（5~8）。
+ *     给 2~4 太细密，和素材自身的笔触纹理打架；
+ *     给 12+ 网点本身就成了图形语言，会盖过猫。
+ *
+ *   inkThreshold 0.08 —— 比出厂预设（0.06）保守一点。
+ *     油画笔触本身就有大量亮度起伏，阈值太低会把每道笔触都描成线
+ *     （实测效果是"猫糊了一层脏东西"）。0.08 只留下真正的轮廓。
+ *
+ *   paper 0.3 —— 纸纹要能感觉到但看不出来。它同时承担一个作用：
+ *     给画面一个统一的底色，把五个主体"钉"在同一张纸上，
+ *     否则它们看起来像五个各自剪下来贴上去的贴纸。
+ */
+const MEDIUM: MediumConfig = {
+  enabled: true,
+  mono: 0.45,
+  halftone: 0.55,
+  halftoneScale: 6,
+  halftoneAngle: 45,
+  dither: 0,
+  inkEdge: 0.45,
+  inkThreshold: 0.08,
+  paper: 0.3,
+  paperColor: '#efe7d6',
+  inkColor: '#1a1714',
+  // ★ 持续颗粒 —— 由墙上时钟驱动，**停下滚动它依然在跳**。
+  //   这是"画面是活的"那一项：滚动和时间是两个独立驱动源，
+  //   缺了它，用户停止滚动时画面会完全冻住。
+  grain: 0.06,
+  grainSpeed: 1,
+  // 和 post 吃同一个活跃度 —— 切章时网点变粗与色差炸开严格同步
+  pulse: 0.4,
+};
+
 export const SITE: SiteConfig = {
   title: 'WebGL Scroll Engine — Cats',
   font: DESIGN.font,
@@ -189,4 +235,6 @@ export const SITE: SiteConfig = {
   post: POST,
   audio: AUDIO,
   carrier: CARRIER,
+  // ★ 媒介层（PHASE 25）。不声明 → 不跑任何 pass，画面与之前逐位相同。
+  medium: MEDIUM,
 };

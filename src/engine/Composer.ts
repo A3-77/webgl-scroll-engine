@@ -6,9 +6,11 @@ import { SceneManager } from './systems/SceneManager';
 import { TransitionSystem, type TransitionTextures } from './systems/TransitionSystem';
 import { PostSystem, type PostDrive } from './systems/PostSystem';
 import { CarrierSystem } from './systems/CarrierSystem';
+import { MediumSystem } from './systems/MediumSystem';
 import { DEFAULT_POST } from '../config/design';
 import type { PostConfig } from '../schema/post';
 import type { CarrierConfig } from '../schema/carrier';
+import type { MediumConfig } from '../schema/medium';
 
 /**
  * ★ 渲染编排器 —— 整站视觉的骨架
@@ -71,6 +73,10 @@ export interface ComposerStats {
   carrierVisible: boolean;
   /** 载体沿路径的进度 0..1 */
   carrierT: number;
+  /** 媒介层是否在跑（PHASE 25） */
+  mediumActive: boolean;
+  /** 本帧展开后的网点强度 —— 看它就能判断媒介层的 pulse 有没有在工作 */
+  mediumHalftone: number;
 }
 
 export interface ComposerOptions {
@@ -127,6 +133,19 @@ export interface ComposerOptions {
    */
   carrier?: CarrierConfig;
   /**
+   * ★ 媒介层配置（PHASE 25）。
+   *
+   * 不传 / `enabled: false` → **一个 pass 都不跑**，深度纹理也不分配，
+   * 画面与 PHASE 25 之前逐位相同。
+   *
+   * 它和 `post` 的区别（这是理解这一层的钥匙）：
+   *   `post`  是**滤镜** —— 只读颜色，加光加颗粒，画面还是照片
+   *   `medium` 是**重绘** —— 读深度和颜色，把画面换成另一种材料
+   *
+   * 详见 `schema/medium.ts` 的文件头。
+   */
+  medium?: MediumConfig;
+  /**
    * @deprecated 后处理已经统一到 `post`。
    * 保留这个开关只是为了让旧的调用点不炸 —— 它等价于 `post.enabled`。
    * 显式传了 `post` 时本参数被忽略。
@@ -157,6 +176,14 @@ export class Composer {
    */
   private carrier: CarrierSystem;
   /**
+   * 媒介层（PHASE 25）。
+   *
+   * ★ 它的位置是「场景 → 纹理」之后、「过渡混合」之前。
+   *   必须在混合之前，因为深度只在场景渲染那一刻有效 ——
+   *   两张画面一混，"这个像素离相机多远"就永久丢失了。
+   */
+  private medium: MediumSystem;
+  /**
    * 缓存上次 setCamera 时的宽高比 —— 变了就重算路径（路径要按屏幕半宽算）
    */
   private carrierAspect = -1;
@@ -181,6 +208,8 @@ export class Composer {
     textureCount: 0,
     carrierVisible: false,
     carrierT: 0,
+    mediumActive: false,
+    mediumHalftone: 0,
   };
 
   constructor(options: ComposerOptions) {
@@ -192,7 +221,13 @@ export class Composer {
     // 建场景。注意每个 section 一个独立 THREE.Scene + 独立 PerspectiveCamera
     // （真实站点也是这样：每个章节有自己的 camera 关键帧轨道，互不干扰）
     this.sceneManager = SceneManager.build(options.scenes, textures, models, 1);
-    this.transition = new TransitionSystem(options.transitionTextures);
+
+    // ★ 媒介层必须先于 TransitionSystem 构造 —— 过渡系统要拿它来重绘场景纹理
+    //   （顺序反过来的话，过渡系统拿不到 medium，媒介层就永远不生效且不报错）
+    this.medium = new MediumSystem(options.medium ?? { enabled: false });
+    this.stats.mediumActive = this.medium.active;
+
+    this.transition = new TransitionSystem(options.transitionTextures, this.medium);
 
     // 后处理链。显式给了 post 就以它为准（此时忽略弃用的 bloom 开关），
     // 否则沿用 DEFAULT_POST，但允许用 bloom:false 把它整体关掉。
@@ -321,6 +356,18 @@ export class Composer {
           }
         : null;
 
+    /**
+     * ★ 媒介层吃**后处理算好的那个活跃度**，不自己再算一遍。
+     *
+     * 代价是滞后一帧（媒介重绘发生在 post.render 之前），
+     * 而活跃度本身有 0.12s 的指数平滑 —— 一帧 ≈ 16ms，肉眼完全不可辨。
+     *
+     * 换来的是「只有一个真相来源」：网点变粗和色差炸开必然是同一个数。
+     * 如果这里自己重写一遍公式，就会出现 PHASE 18 那种
+     * 「两套语义悄悄分叉」的缺陷 —— 而那种缺陷会伪装成素材问题。
+     */
+    const activity = this.post.stats.activity;
+
     if (this.enablePost) {
       this.transition.render(
         gl,
@@ -331,6 +378,7 @@ export class Composer {
           timeSec,
           mouse: state.mouse,
           carrier: carrierInput,
+          activity,
         },
         this.rtComposite,
       );
@@ -350,6 +398,7 @@ export class Composer {
           timeSec,
           mouse: state.mouse,
           carrier: carrierInput,
+          activity,
         },
         null,
       );
@@ -366,6 +415,7 @@ export class Composer {
     this.stats.postActivity = this.post.stats.activity;
     this.stats.carrierVisible = this.carrier.stats.visible;
     this.stats.carrierT = this.carrier.stats.t;
+    this.stats.mediumHalftone = this.medium.stats.halftone;
   }
 
   /**
@@ -402,6 +452,7 @@ export class Composer {
     this.transition.dispose();
     this.post.dispose();
     this.carrier.dispose();
+    this.medium.dispose();
     this.sceneManager.dispose();
   }
 }
